@@ -58,11 +58,9 @@
   "Holds the request token")
 (defvar pocket-api-access-token-and-username nil
   "Holds the current access token")
-(defvar pocket-api-default-extra-headers (let ((extra-headers (make-hash-table :test 'equal)))
-                                          (puthash 'Host "getpocket.com" extra-headers)
-                                          (puthash 'Content-type "application/x-www-form-urlencoded; charset=UTF-8" extra-headers)
-                                          (puthash 'X-Accept "application/json" extra-headers)
-                                          extra-headers)
+(defvar pocket-api-default-extra-headers '(("Host" . "getpocket.com")
+                                           ("Content-type" . "application/x-www-form-urlencoded; charset=UTF-8")
+                                           ("X-Accept" . "application/json"))
   "Default extra headers")
 
 ;;no use hiding this I suppose
@@ -103,8 +101,8 @@
   "Post POST-DATA-ALIST to URL and then call the CALLBACK with data decoded as utf-8"
   (request url
            :type "POST"
-           :data post-data-alist
            :headers pocket-api-default-extra-headers
+           :data post-data-alist
            :parser (lambda ()
                      (json-read-from-string (decode-coding-string (buffer-string) 'utf-8)))
            :success (cl-function
