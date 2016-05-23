@@ -59,7 +59,7 @@
 (defvar pocket-api-access-token-and-username nil
   "Holds the current access token")
 (defvar pocket-api-default-extra-headers '(("Host" . "getpocket.com")
-                                           ("Content-type" . "application/x-www-form-urlencoded; charset=UTF-8")
+                                           ("Content-Type" . "application/x-www-form-urlencoded; charset=UTF-8")
                                            ("X-Accept" . "application/json"))
   "Default extra headers")
 
@@ -102,7 +102,7 @@
   (request url
            :type "POST"
            :headers pocket-api-default-extra-headers
-           :data post-data-alist
+           :data (request--urlencode-alist post-data-alist)
            :parser (lambda ()
                      (json-read-from-string (decode-coding-string (buffer-string) 'utf-8)))
            :success (cl-function
