@@ -1,44 +1,47 @@
-;;; pocket-api.el --- Read and write to Pocket (getpocket.com) ;; -*- lexical-binding: t -*-
+;;; pocket-api.el --- another pocket api -*- lexical-binding: t; -*-
+
+;; Copyright (C) 2004-2016 Free Software Foundation, Inc.
+
 ;; Author: DarkSun <lujun9972@gmail.com>
+;; Created: 2016-05-23
 ;; Version: 0.1
-;; Url: http://github.com/lujun9972/pocket-api
-;; Keywords: emacs, pocket, bookmarks
-;; Package-Requires: ((request "0.5.2") (emacs "24"))
+;; Keywords: convenience, pocket
+;; Package-Requires: ((emacs "24.4") (request "20160424.2032"))
+;; URL: https://github.com/lujun9972/pocket-api.el
+
+;; This file is NOT part of GNU Emacs.
+
+;; This program is free software; you can redistribute it and/or modify
+;; it under the terms of the GNU General Public License as published by
+;; the Free Software Foundation, either version 3 of the License, or
+;; (at your option) any later version.
+
+;; This program is distributed in the hope that it will be useful,
+;; but WITHOUT ANY WARRANTY; without even the implied warranty of
+;; MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+;; GNU General Public License for more details.
+
+;; You should have received a copy of the GNU General Public License
+;; along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+;;; Source code
+;;
+;; pocket-api's code can be found here:
+;;   http://github.com/lujun9972/pocket-api.el
 
 ;;; Commentary:
 
-;; Put this file in your load-path somewhere and require it.
+;; The usage is similar with [[https://github.com/pterygota/el-pocket][el-pocket]]. 
 
-;; Or use the MELPA repository to install it via package-install.
+;; The first time using `pocket-api', you should execute =pocket-api-authorize= twice.
 
-;; Now do an M-x pocket-api-authorize RET. The first time you do this
-;; you will be directed to the oauth/request page, where you can click
-;; on authorize. After authorizing, you may see a message that makes
-;; it seem like it didn't work (e.g. broken images or redirect
-;; failures). This is because we haven't yet set up proper
-;; authorization.
+;; 1. The first time execute =pocket-api-authorize= you will be directed to the oauth/request page, where you can click on authorize. After authorizing, you may see an error page, but it don't matter.
 
-;; Now, return to emacs and do M-x pocket-api-authorize RET again. This
-;; time you should get an access token, and it will be saved to
-;; ~/.pocket-api-auth.json.
+;; 2. And then, the second time execute =pocket-api-authorize= you will get the access token, and it will be saved to =~/.el-pocket-auth.json=
 
-;; Once this is done you should be able to use M-x pocket-api-add RET to add URLs.
+;; After that, you don't need to do the authorizing job any more, just use =(el-pocket-load-auht)= to reload the access token.
 
-;; Reading articles still neeed to be added. Maybe it could be
-;; integrated using the Diffbot's Article Extraction API
-
-;; Now you can add these lines to your init file for future use:
-
-;;  (require 'pocket-api)
-;;  (pocket-api-load-auth)
-
-;;; History:
-
-;; Changes from 0.1 to 0.2:
-;; * Remove '*' from names.
-;; * Create a customization group and add some doc strings.
-;; * Use defvar instead of setq'ing undefined variables.
-;; * Address other compilation warnings.
+;; Usng =M-x el-pocket-add= to add URLs
 
 ;;; Code:
 (require 'cl-lib)
@@ -100,12 +103,13 @@
         (pocket-api-get-request-token)))))
 
 ;; http post helper function
-(defun pocket-api--post (url post-data-alist callback)
+(cl-defun pocket-api--post (url post-data-alist callback &key sync)
   "Post POST-DATA-ALIST to URL and then call the CALLBACK with data decoded as utf-8"
   (request url
            :type "POST"
            :headers pocket-api-default-extra-headers
            :data (request--urlencode-alist post-data-alist) ;若headers中设在了Content-Type，则:data必须为字符串，因为它表示发送给服务器的格式不一定是form表单的格式
+           :sync sync
            :parser (lambda ()
                      (json-read-from-string (decode-coding-string (buffer-string) 'utf-8)))
            :success (cl-function
@@ -155,17 +159,22 @@
 ;; skeleton function to test getting things from pocket
 ;; response is printed to *Messages*
 ;; TODO make this do useful things
-(defun pocket-api-get ()
+(cl-defun pocket-api-get (&key (offset 1) (count 10))
   "Gets things from your pocket."
   (if (pocket-api-access-granted-p)
-      (pocket-api--post  "https://getpocket.com/v3/get"
-                         `(("consumer_key" . ,pocket-api-consumer-key)
-                           ("access_token" . ,(cdr (assoc 'access_token pocket-api-access-token-and-username)))
-                           ("count" . "5")
-                           ("detailType" . "simple"))
-                         (lambda (data)
-                           data))
+      (let ((offset (number-to-string offset))
+            (count (number-to-string count)))
+        (request-response-data  (pocket-api--post  "https://getpocket.com/v3/get"
+                                                   `(("consumer_key" . ,pocket-api-consumer-key)
+                                                     ("access_token" . ,(cdr (assoc 'access_token pocket-api-access-token-and-username)))
+                                                     ("offset" . ,offset)
+                                                     ("count" . ,count)
+                                                     ("detailType" . "simple"))
+                                                   (lambda (data)
+                                                     data)
+                                                   :sync t)))
     (pocket-api-authorize)))
+;; (pocket-api-get)
 
 ;;oh my gosh
 (defun pocket-api-add (url-to-add)
