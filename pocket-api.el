@@ -81,13 +81,16 @@
   (with-temp-file auth-file
     (insert (json-encode-alist token-and-username))))
 
+;;;###autoload
 (defun pocket-api-clear-auth ()
+  (interactive)
   (setq pocket-api-request-token nil)
   (setq pocket-api-access-token-and-username nil))
 
 ;; the authorization dance:
 ;; TODO - make a nice interface for this
 ;; TODO - maybe use the oauth or oauth2 package instead?
+;;;###autoload
 (defun pocket-api-authorize ()
   (interactive)
   (unless pocket-api-access-token-and-username
@@ -102,7 +105,7 @@
   (request url
            :type "POST"
            :headers pocket-api-default-extra-headers
-           :data (request--urlencode-alist post-data-alist)
+           :data (request--urlencode-alist post-data-alist) ;若headers中设在了Content-Type，则:data必须为字符串，因为它表示发送给服务器的格式不一定是form表单的格式
            :parser (lambda ()
                      (json-read-from-string (decode-coding-string (buffer-string) 'utf-8)))
            :success (cl-function
