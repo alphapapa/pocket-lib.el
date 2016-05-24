@@ -62,7 +62,7 @@
 (defvar pocket-api-access-token-and-username nil
   "Holds the current access token")
 (defvar pocket-api-default-extra-headers '(("Host" . "getpocket.com")
-                                           ("Content-Type" . "application/x-www-form-urlencoded; charset=UTF-8")
+                                           ("Content-Type" . "application/json; charset=UTF-8")
                                            ("X-Accept" . "application/json"))
   "Default extra headers")
 
@@ -102,13 +102,15 @@
           (pocket-api-get-access-token)
         (pocket-api-get-request-token)))))
 
+(json-encode '((a . 1) (b . 2)))
+
 ;; http post helper function
-(cl-defun pocket-api--post (url post-data-alist callback &key sync)
+(cl-defun pocket-api--post (url post-data-json callback &key sync)
   "Post POST-DATA-ALIST to URL and then call the CALLBACK with data decoded as utf-8"
   (request url
            :type "POST"
            :headers pocket-api-default-extra-headers
-           :data (request--urlencode-alist post-data-alist) ;若headers中设在了Content-Type，则:data必须为字符串，因为它表示发送给服务器的格式不一定是form表单的格式
+           :data (json-encode post-data-json) ;若headers中设在了Content-Type，则:data必须为字符串，因为它表示发送给服务器的格式不一定是form表单的格式
            :sync sync
            :parser (lambda ()
                      (json-read-from-string (decode-coding-string (buffer-string) 'utf-8)))
@@ -172,8 +174,6 @@
                                                    :sync t)))
     (pocket-api-authorize)))
 
-
-
 (defun pocket-api-add (url-to-add)
   "Add URL-TO-ADD to your pocket."
   (interactive
@@ -187,6 +187,7 @@
                         (lambda (data)
                           data))
     (pocket-api-authorize)))
+
 
 (provide 'pocket-api)
 
