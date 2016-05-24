@@ -156,9 +156,6 @@
   "Do we have access yet?"
   pocket-api-access-token-and-username)
 
-;; skeleton function to test getting things from pocket
-;; response is printed to *Messages*
-;; TODO make this do useful things
 (cl-defun pocket-api-get (&key (offset 1) (count 10))
   "Gets things from your pocket."
   (if (pocket-api-access-granted-p)
@@ -174,9 +171,9 @@
                                                      data)
                                                    :sync t)))
     (pocket-api-authorize)))
-;; (pocket-api-get)
 
-;;oh my gosh
+
+
 (defun pocket-api-add (url-to-add)
   "Add URL-TO-ADD to your pocket."
   (interactive
