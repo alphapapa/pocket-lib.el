@@ -6,7 +6,7 @@
 ;; Created: 2016-05-23
 ;; Version: 0.1
 ;; Keywords: convenience, pocket
-;; Package-Requires: ((emacs "24.4") (request "20160424.2032"))
+;; Package-Requires: ((emacs "24.4") (request "0.2"))
 ;; URL: https://github.com/lujun9972/pocket-api.el
 
 ;; This file is NOT part of GNU Emacs.
@@ -102,8 +102,6 @@
           (pocket-api-get-access-token)
         (pocket-api-get-request-token)))))
 
-(json-encode '((a . 1) (b . 2)))
-
 ;; http post helper function
 (cl-defun pocket-api--post (url post-data-json callback &key sync)
   "Post POST-DATA-ALIST to URL and then call the CALLBACK with data decoded as utf-8"
@@ -158,6 +156,7 @@
   "Do we have access yet?"
   pocket-api-access-token-and-username)
 
+;;;###autoload
 (cl-defun pocket-api-get (&key (offset 1) (count 10))
   "Gets things from your pocket."
   (if (pocket-api-access-granted-p)
@@ -174,11 +173,10 @@
                                                    :sync t)))
     (pocket-api-authorize)))
 
+;;;###autoload
 (defun pocket-api-add (url-to-add)
   "Add URL-TO-ADD to your pocket."
-  (interactive
-   (list
-    (read-string "pocket-api url: ")))
+  (interactive (list (read-string "pocket-api url: ")))
   (if (pocket-api-access-granted-p)
       (pocket-api--post  "https://getpocket.com/v3/add"
                         `(("consumer_key" . ,pocket-api-consumer-key)
@@ -188,6 +186,59 @@
                           data))
     (pocket-api-authorize)))
 
+(defun pocket-api-send-basic-action (action item_id)
+  "Modify the item which specified by ITEM-ID.
+
+ACTION only support basic actions which means add,archive,readd,favorite,unfavorite,delete"
+  (if (pocket-api-access-granted-p)
+      (let ((actions (vector `((action . ,action)
+                              (item_id . ,item_id)))))
+        (request-response-data (pocket-api--post "https://getpocket.com/v3/send"
+                                                 `(("consumer_key" . ,pocket-api-consumer-key)
+                                                   ("access_token" . ,(cdr (assoc 'access_token pocket-api-access-token-and-username)))
+                                                   ("actions" . ,actions))
+                                                 (lambda (data)
+                                                   data))))
+    (pocket-api-authorize)))
+
+;;;###autoload
+(defun pocket-api-archive (item_id)
+  "Archive item which specified by ITEM_ID"
+  (interactive (list (read-number "pocket-api item_id: ")))
+  (pocket-api-send-basic-action 'archive item_id))
+
+;;;###autoload
+(defun pocket-api-readd (item_id)
+  "Readd item which specified by ITEM_ID"
+  (interactive (list (read-number "pocket-api item_id: ")))
+  (pocket-api-send-basic-action 'readd item_id))
+
+;;;###autoload
+(defun pocket-api-favorite (item_id)
+  "Favorite item which specified by ITEM_ID"
+  (interactive (list (read-number "pocket-api item_id: ")))
+  (pocket-api-send-basic-action 'favorite item_id))
+
+;;;###autoload
+(defun pocket-api-unfavorite (item_id)
+  "Unfavorite item which specified by ITEM_ID"
+  (interactive (list (read-number "pocket-api item_id: ")))
+  (pocket-api-send-basic-action 'unfavorite item_id))
+
+;;;###autoload
+(defun pocket-api-delete (item_id)
+  "Delete item which specified by ITEM_ID"
+  (interactive (list (read-number "pocket-api item_id: ")))
+  (pocket-api-send-basic-action 'delete item_id))
+
+
+;; (dolist (action '("archive" "readd" "favorite" "unfavorite" "delete"))
+;;   (let ((fn-symbol (intern (format "pocket-api-%s" action))))
+;;     (fset fn-symbol (lambda (item_id)
+;;                       (pocket-api-send-basic-action action item_id)))))
+
+;; (pocket-api-get)
+;; (pocket-api-send-basic-action 'readd 271799625)
 
 (provide 'pocket-api)
 
