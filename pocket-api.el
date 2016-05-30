@@ -53,9 +53,9 @@
   "Pocket"
   :prefix "pocket-api-"
   :group 'external)
-(defcustom pocket-api-oauth-request-url "https://getpocket.com/v3/oauth/request"
+(defvar pocket-api-oauth-request-url "https://getpocket.com/v3/oauth/request"
   "URL to use for OAuth request.")
-(defcustom pocket-api-oauth-authorize-url "https://getpocket.com/v3/oauth/authorize"
+(defvar pocket-api-oauth-authorize-url "https://getpocket.com/v3/oauth/authorize"
   "URL to use for OAuth authorization.")
 (defvar pocket-api-request-token nil
   "Holds the request token")
@@ -68,11 +68,15 @@
 
 ;;no use hiding this I suppose
 (defcustom pocket-api-consumer-key "30410-da1b34ce81aec5843a2214f4"
-  "API consumer key")
+  "API consumer key"
+  :group 'pocket-api
+  :type 'string)
 
 ;;access-key and username stored here
 (defcustom pocket-api-auth-file (expand-file-name "~/.pocket-api-auth.json")
-  "JSON file to store the authorization.")
+  "JSON file to store the authorization."
+  :group 'point-api
+  :type 'file)
 
 (defun pocket-api-load-auth (&optional auth-file)
   (let ((auth-file (or auth-file
