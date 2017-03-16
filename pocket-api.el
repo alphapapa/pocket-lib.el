@@ -94,13 +94,17 @@
   (setq pocket-api-request-token nil)
   (setq pocket-api-access-token-and-username nil))
 
+(defun pocket-api-access-granted-p ()
+  "Do we have access yet?"
+  pocket-api-access-token-and-username)
+
 ;; the authorization dance:
 ;; TODO - make a nice interface for this
 ;; TODO - maybe use the oauth or oauth2 package instead?
 ;;;###autoload
 (defun pocket-api-authorize ()
   (interactive)
-  (unless pocket-api-access-token-and-username
+  (unless (pocket-api-access-granted-p)
     (unless (pocket-api-load-auth)
       (if pocket-api-request-token
           (pocket-api-get-access-token)
@@ -156,54 +160,50 @@
                      ;; (pocket-api-authorize)
                      )))
 
-(defun pocket-api-access-granted-p ()
-  "Do we have access yet?"
-  pocket-api-access-token-and-username)
-
 ;;;###autoload
 (cl-defun pocket-api-get (&key (offset 1) (count 10))
   "Gets things from your pocket."
-  (if (pocket-api-access-granted-p)
-      (let ((offset (number-to-string offset))
-            (count (number-to-string count)))
-        (request-response-data  (pocket-api--post  "https://getpocket.com/v3/get"
-                                                   `(("consumer_key" . ,pocket-api-consumer-key)
-                                                     ("access_token" . ,(cdr (assoc 'access_token pocket-api-access-token-and-username)))
-                                                     ("offset" . ,offset)
-                                                     ("count" . ,count)
-                                                     ("detailType" . "simple"))
-                                                   (lambda (data)
-                                                     data)
-                                                   :sync t)))
-    (pocket-api-authorize)))
+  (unless (pocket-api-access-granted-p)
+    (pocket-api-authorize))
+  (let ((offset (number-to-string offset))
+        (count (number-to-string count)))
+    (request-response-data  (pocket-api--post  "https://getpocket.com/v3/get"
+                                               `(("consumer_key" . ,pocket-api-consumer-key)
+                                                 ("access_token" . ,(cdr (assoc 'access_token pocket-api-access-token-and-username)))
+                                                 ("offset" . ,offset)
+                                                 ("count" . ,count)
+                                                 ("detailType" . "simple"))
+                                               (lambda (data)
+                                                 data)
+                                               :sync t))))
 
 ;;;###autoload
 (defun pocket-api-add (url-to-add)
   "Add URL-TO-ADD to your pocket."
   (interactive (list (read-string "pocket-api url: ")))
-  (if (pocket-api-access-granted-p)
-      (pocket-api--post  "https://getpocket.com/v3/add"
-                        `(("consumer_key" . ,pocket-api-consumer-key)
-                          ("access_token" . ,(cdr (assoc 'access_token pocket-api-access-token-and-username)))
-                          ("url" . ,url-to-add))
-                        (lambda (data)
-                          data))
-    (pocket-api-authorize)))
+  (unless (pocket-api-access-granted-p)
+    (pocket-api-authorize))
+  (pocket-api--post  "https://getpocket.com/v3/add"
+                     `(("consumer_key" . ,pocket-api-consumer-key)
+                       ("access_token" . ,(cdr (assoc 'access_token pocket-api-access-token-and-username)))
+                       ("url" . ,url-to-add))
+                     (lambda (data)
+                       data)))
 
 (defun pocket-api-send-basic-action (action item_id)
   "Modify the item which specified by ITEM-ID.
 
 ACTION only support basic actions which means add,archive,readd,favorite,unfavorite,delete"
-  (if (pocket-api-access-granted-p)
-      (let ((actions (vector `((action . ,action)
-                              (item_id . ,item_id)))))
-        (request-response-data (pocket-api--post "https://getpocket.com/v3/send"
-                                                 `(("consumer_key" . ,pocket-api-consumer-key)
-                                                   ("access_token" . ,(cdr (assoc 'access_token pocket-api-access-token-and-username)))
-                                                   ("actions" . ,actions))
-                                                 (lambda (data)
-                                                   data))))
-    (pocket-api-authorize)))
+  (unless (pocket-api-access-granted-p)
+    (pocket-api-authorize))
+  (let ((actions (vector `((action . ,action)
+                           (item_id . ,item_id)))))
+    (request-response-data (pocket-api--post "https://getpocket.com/v3/send"
+                                             `(("consumer_key" . ,pocket-api-consumer-key)
+                                               ("access_token" . ,(cdr (assoc 'access_token pocket-api-access-token-and-username)))
+                                               ("actions" . ,actions))
+                                             (lambda (data)
+                                               data)))))
 
 ;;;###autoload
 (defun pocket-api-archive (item_id)
