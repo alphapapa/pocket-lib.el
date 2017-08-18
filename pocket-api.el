@@ -318,11 +318,12 @@ See <https://getpocket.com/developer/docs/v3/retrieve>."
      (pocket-api--request 'send
        :data data :sync t))))
 
-;;;;; Commands
+;;;;; Actions
 
 (defun pocket-api--archive (&rest items)
   "Archive ITEMS."
-  ;; FIXME: Needs error handling.
+  ;; FIXME: Needs error handling...maybe.  It does give an error in
+  ;; the minibuffer if the API command gives an error.
   (pocket-api--send
    :actions (vconcat
              (--map (list :action "archive"
