@@ -1,13 +1,13 @@
-;;; pocket-api.el --- another pocket api -*- lexical-binding: t; -*-
+;;; pocket-api.el --- another pocket api  -*- lexical-binding: t; -*-
 
-;; Copyright (C) 2004-2016 Free Software Foundation, Inc.
+;; Copyright (C) 2004-2017 Free Software Foundation, Inc.
 
-;; Author: DarkSun <lujun9972@gmail.com>
-;; Created: 2016-05-23
-;; Version: 0.1
-;; Keywords: convenience, pocket
-;; Package-Requires: ((emacs "24.4") (request "0.2"))
-;; URL: https://github.com/lujun9972/pocket-api.el
+;; Author: Adam Porter <adam@alphapapa.net
+;; Created: 2017-08-18
+;; Version: 0.1-pre
+;; Keywords: pocket
+;; Package-Requires: ((emacs "25.1") (request "0.2") (dash "2.13.0") (kv "0.0.19"))
+;; URL: https://github.com/alphapapa/pocket-api.el
 
 ;; This file is NOT part of GNU Emacs.
 
@@ -24,24 +24,16 @@
 ;; You should have received a copy of the GNU General Public License
 ;; along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-;;; Source code
-;;
-;; pocket-api's code can be found here:
-;;   http://github.com/lujun9972/pocket-api.el
-
 ;;; Commentary:
 
-;; The usage is similar with [[https://github.com/pterygota/el-pocket][el-pocket]].
+;; This package is based on pocket-api.el by DarkSun/lujun9972 at
+;; <https://github.com/lujun9972/pocket-api.el>, which is based on
+;; el-pocket by Tod Davies at <https://github.com/pterygota/el-pocket>.
 
-;; The first time using `pocket-api', you should execute =pocket-api-authorize= twice.
+;; It has essentially been completely written; no code remains except
+;; `pocket-api-default-extra-headers' and a few lines in the call to
+;; `request'.
 
-;; 1. The first time execute =pocket-api-authorize= you will be directed to the oauth/request page, where you can click on authorize. After authorizing, you may see an error page, but it don't matter.
-
-;; 2. And then, the second time execute =pocket-api-authorize= you will get the access token, and it will be saved to =~/.el-pocket-auth.json=
-
-;; After that, you don't need to do the authorizing job any more, just use =(el-pocket-load-auht)= to reload the access token.
-
-;; Usng =M-x el-pocket-add= to add URLs
 
 ;;; Code:
 
@@ -145,7 +137,7 @@ If FORCE is non-nil, get a new token."
             ;;  auth URL.  (browse-url url)
             (kill-new url))
           (setq pocket-api--access-token-have-opened-browser t)
-          (error "Please go to the URL in the clipboard to  authorize the token request, then try again")))))
+          (error "Please go to the URL in the clipboard to authorize the token request, then try again")))))
 
 (defun pocket-api--reset-auth ()
   "Reset all auth variables."
