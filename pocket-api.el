@@ -302,22 +302,13 @@ See <https://getpocket.com/developer/docs/v3/retrieve>."
      (pocket-api--request 'get
        :data data :sync t))))
 
-(cl-defun pocket-api--send (&key (offset 0) (count 10) (detail-type "simple")
-                                 actions)
-  "Return JSON response for a \"send\" API request.
+(cl-defun pocket-api--send (actions)
+  "Return JSON response for a \"send\" API request containing ACTIONS.
 
-By default, OFFSET is 0, COUNT is 10, and DETAIL-TYPE is
-\"simple\".  All other keys are unset by default.  Keys set to
-nil will not be sent in the request.
-
-See <https://getpocket.com/developer/docs/v3/retrieve>."
-
-  (let ((offset (number-to-string offset))
-        (count (number-to-string count))
-        (data (list :actions actions)))
-    (request-response-data
-     (pocket-api--request 'send
-       :data data :sync t))))
+See <https://getpocket.com/developer/docs/v3/modify>."
+  (request-response-data
+   (pocket-api--request 'send
+     :data (list :actions actions) :sync t)))
 
 ;;;;; Actions
 
@@ -325,11 +316,10 @@ See <https://getpocket.com/developer/docs/v3/retrieve>."
   "Archive ITEMS."
   ;; FIXME: Needs error handling...maybe.  It does give an error in
   ;; the minibuffer if the API command gives an error.
-  (pocket-api--send
-   :actions (vconcat
-             (--map (list :action "archive"
-                          :item_id (string-to-number (alist-get 'item_id it)))
-                    items))))
+  (pocket-api--send (vconcat
+                     (--map (list :action "archive"
+                                  :item_id (string-to-number (alist-get 'item_id it)))
+                            items))))
 
 ;;;;; Helpers
 
