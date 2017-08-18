@@ -304,11 +304,13 @@ See <https://getpocket.com/developer/docs/v3/retrieve>."
 
 (cl-defun pocket-api--send (actions)
   "Return JSON response for a \"send\" API request containing ACTIONS.
+ACTIONS should be a list of actions; this function will convert
+it into a vector automatically.
 
 See <https://getpocket.com/developer/docs/v3/modify>."
   (request-response-data
    (pocket-api--request 'send
-     :data (list :actions actions) :sync t)))
+     :data (list :actions (vconcat actions)) :sync t)))
 
 ;;;;; Actions
 
@@ -316,10 +318,9 @@ See <https://getpocket.com/developer/docs/v3/modify>."
   "Archive ITEMS."
   ;; FIXME: Needs error handling...maybe.  It does give an error in
   ;; the minibuffer if the API command gives an error.
-  (pocket-api--send (vconcat
-                     (--map (list :action "archive"
-                                  :item_id (alist-get 'item_id it))
-                            items))))
+  (pocket-api--send (--map (list :action "archive"
+                                 :item_id (alist-get 'item_id it))
+                           items)))
 
 ;;;;; Helpers
 
