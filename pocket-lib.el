@@ -1,4 +1,4 @@
-;;; pocket-api.el --- another pocket api  -*- lexical-binding: t; -*-
+;;; pocket-lib.el --- Library for accessing getpocket.com API  -*- lexical-binding: t; -*-
 
 ;; Copyright (C) 2004-2017 Free Software Foundation, Inc.
 
@@ -7,7 +7,7 @@
 ;; Version: 0.1-pre
 ;; Keywords: pocket
 ;; Package-Requires: ((emacs "25.1") (request "0.2") (dash "2.13.0") (kv "0.0.19"))
-;; URL: https://github.com/alphapapa/pocket-api.el
+;; URL: https://github.com/alphapapa/pocket-lib.el
 
 ;; This file is NOT part of GNU Emacs.
 
@@ -31,8 +31,8 @@
 ;; el-pocket by Tod Davies at <https://github.com/pterygota/el-pocket>.
 
 ;; It has essentially been completely written; no code remains except
-;; `pocket-api-default-extra-headers' and a few lines in the call to
-;; `request'.
+;; `pocket-api-default-extra-headers' a few lines in the call to
+;; `request', and the consumer-key is currently the same.
 
 
 ;;; Code:
@@ -153,10 +153,12 @@ If FORCE is non-nil, get a new token."
   "Return request response struct for an API request to \"https://getpocket/com/v3/ENDPOINT\".
 
 ENDPOINT may be a string or symbol, e.g. `get'.  DATA should be a
-plist of API parameters.  SYNC is passed to `request''s `:sync'
-keyword.
+plist of API parameters; keys with nil values are removed.  SYNC
+is passed to `request''s `:sync' keyword.
 
-The consumer key and access token are included automatically.
+The consumer key and access token are included automatically,
+unless NO-AUTH is set, in which case the access token is left
+out (facilitating authorization requests).
 
 The response body is automatically parsed with `json-read'."
   (declare (indent defun))
@@ -196,7 +198,6 @@ By default, OFFSET is 0, COUNT is 10, and DETAIL-TYPE is
 nil will not be sent in the request.
 
 See <https://getpocket.com/developer/docs/v3/retrieve>."
-
   (let ((offset (number-to-string offset))
         (count (number-to-string count))
         (data (list :offset offset :count count :detail-type detail-type
@@ -221,7 +222,7 @@ See <https://getpocket.com/developer/docs/v3/modify>."
 
 (defun pocket-api--archive (&rest items)
   "Archive ITEMS."
-  ;; FIXME: Needs error handling...maybe.  It does give an error in
+  ;; MAYBE: Needs error handling...maybe.  It does give an error in
   ;; the minibuffer if the API command gives an error.
   (pocket-api--send (--map (list :action "archive"
                                  :item_id (alist-get 'item_id it))
