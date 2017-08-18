@@ -76,17 +76,17 @@
 (cl-defun pocket-lib--authorize (&key force)
   "Get and save authorization token.
 If token already exists, don't get a new one, unless FORCE is non-nil."
-  (when (or (not pocket-lib--access-token) force)
+  (when (or (null pocket-lib--access-token) force)
     (unless force
       ;; Try to load from file
       (pocket-lib--load-access-token))
-    (unless (and pocket-lib--access-token
-                 (not force))
+    (when (or (null pocket-lib--access-token)
+              force)
       ;; Get new token
       (if-let ((request-token (pocket-lib--request-token :force force))
                (access-token (pocket-lib--access-token request-token :force force)))
           (pocket-lib--save-access-token access-token)
-        (error "Unable to authorize")))))
+        (error "Unable to authorize (request-token:%s)" request-token)))))
 
 (defun pocket-lib--load-access-token ()
   "Load access token from `pocket-lib-token-file'."
@@ -105,8 +105,10 @@ If token already exists, don't get a new one, unless FORCE is non-nil."
 If no token exists, or if FORCE is non-nil, get a new token."
   (when (or (not pocket-lib--request-token) force)
     (let* ((response (pocket-lib--request 'oauth/request
-                                          :no-auth t :sync t
-                                          :data (list :redirect_uri "http://www.google.com")))
+                       :data (list :redirect_uri "http://www.example.com")
+                       ;; Sync is required here, otherwise there won't
+                       ;; be a response when we try to parse it
+                       :no-auth t :sync t))
            (data (request-response-data response))
            (token (alist-get 'code data)))
       (unless token
@@ -124,8 +126,10 @@ If FORCE is non-nil, get a new token."
                  (not force))
             ;; Already authorized in browser; try to get token
             (let ((response (pocket-lib--request 'oauth/authorize
-                                                 :data (list :code request-token)
-                                                 :no-auth t :sync t)))
+                              :data (list :code request-token)
+                              ;; Sync is required here, otherwise there won't
+                              ;; be a response when we try to parse it
+                              :no-auth t :sync t)))
               (or (request-response-data response)
                   (error "Unable to get access token: %s" response)))
           ;; Not authorized yet, or forcing; browse to authorize
