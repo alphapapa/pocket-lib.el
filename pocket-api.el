@@ -44,6 +44,9 @@
 ;; Usng =M-x el-pocket-add= to add URLs
 
 ;;; Code:
+
+;;;; Requirements
+
 (require 'cl-lib)
 (require 'json)
 (require 'request)
@@ -51,203 +54,110 @@
 (require 'dash)
 (require 'kv)
 
-;;various mouse-eared items
+;;;; Variables
+
+(defvar pocket-api--access-token-have-opened-browser nil)
+(defvar pocket-api--request-token nil)
+(defvar pocket-api--access-token nil)
+(defconst pocket-api-default-extra-headers '(("Host" . "getpocket.com")
+                                             ("Content-Type" . "application/json; charset=UTF-8")
+                                             ("X-Accept" . "application/json")))
+
+;;;;; Customization
+
 (defgroup pocket-api nil
   "Pocket"
-  :prefix "pocket-api-"
   :group 'external)
-(defvar pocket-api-oauth-request-url "https://getpocket.com/v3/oauth/request"
-  "URL to use for OAuth request.")
-(defvar pocket-api-oauth-authorize-url "https://getpocket.com/v3/oauth/authorize"
-  "URL to use for OAuth authorization.")
-(defvar pocket-api-request-token nil
-  "Holds the request token")
-(defvar pocket-api-access-token-and-username nil
-  "Holds the current access token")
-(defvar pocket-api-default-extra-headers '(("Host" . "getpocket.com")
-                                           ("Content-Type" . "application/json; charset=UTF-8")
-                                           ("X-Accept" . "application/json"))
-  "Default extra headers")
 
-;;no use hiding this I suppose
 (defcustom pocket-api-consumer-key "30410-da1b34ce81aec5843a2214f4"
   "API consumer key"
-  :group 'pocket-api
   :type 'string)
 
-;;access-key and username stored here
-(defcustom pocket-api-auth-file (expand-file-name "~/.pocket-api-auth.json")
-  "JSON file to store the authorization."
-  :group 'point-api
+(defcustom pocket-api-token-file (expand-file-name "~/.cache/emacs-pocket-api-token.json")
+  "Pocket API token stored in this file."
   :type 'file)
 
-(defun pocket-api-load-auth (&optional auth-file)
-  (let ((auth-file (or auth-file
-                       pocket-api-auth-file)))
-    (when (file-readable-p auth-file)
-      (setq pocket-api-access-token-and-username (json-read-file auth-file)))))
+;;;; Functions
 
-(defun pocket-api-save-auth (token-and-username auth-file)
-  (with-temp-file auth-file
-    (insert (json-encode-alist token-and-username))))
+;;;;; Authorization
 
-;;;###autoload
-(defun pocket-api-clear-auth ()
-  (interactive)
-  (setq pocket-api-request-token nil)
-  (setq pocket-api-access-token-and-username nil))
+(cl-defun pocket-api--authorize (&key force)
+  "Get and save authorization token.
+If token already exists, don't get a new one, unless FORCE is non-nil."
+  (when (or (not pocket-api--access-token) force)
+    (unless force
+      ;; Try to load from file
+      (pocket-api--load-access-token))
+    (unless (and pocket-api--access-token
+                 (not force))
+      ;; Get new token
+      (if-let ((request-token (pocket-api--request-token :force force))
+               (access-token (pocket-api--access-token request-token :force force)))
+          (pocket-api--save-access-token access-token)
+        (error "Unable to authorize")))))
 
-(defun pocket-api-access-granted-p ()
-  "Do we have access yet?"
-  pocket-api-access-token-and-username)
+(defun pocket-api--load-access-token ()
+  "Load access token from `pocket-api-token-file'."
+  (when (file-readable-p pocket-api-token-file)
+    (setq pocket-api--access-token (ignore-errors
+                                     (json-read-file pocket-api-token-file)))))
 
-;; the authorization dance:
-;; TODO - make a nice interface for this
-;; TODO - maybe use the oauth or oauth2 package instead?
-;;;###autoload
-(defun pocket-api-authorize ()
-  (interactive)
-  (unless (pocket-api-access-granted-p)
-    (unless (pocket-api-load-auth)
-      (if pocket-api-request-token
-          (pocket-api-get-access-token)
-        (pocket-api-get-request-token)))))
+(defun pocket-api--save-access-token (token)
+  "Write TOKEN to `pocket-api-auth-file' and set variable."
+  (with-temp-file pocket-api-token-file
+    (insert (json-encode-alist token)))
+  (setq pocket-api--access-token token))
 
-;; http post helper function
-(cl-defun pocket-api--post (url post-data-json callback &key sync)
-  "Post POST-DATA-ALIST to URL and then call the CALLBACK with data decoded as utf-8"
-  (request url
-           :type "POST"
-           :headers pocket-api-default-extra-headers
-           :data (json-encode post-data-json) ;若headers中设在了Content-Type，则:data必须为字符串，因为它表示发送给服务器的格式不一定是form表单的格式
-           :sync sync
-           :parser (lambda ()
-                     (json-read-from-string (decode-coding-string (buffer-string) 'utf-8)))
-           :success (cl-function
-                     (lambda (&key data &allow-other-keys)
-                       (funcall callback data)))))
+(cl-defun pocket-api--request-token (&key force)
+  "Return request token.
+If no token exists, or if FORCE is non-nil, get a new token."
+  (when (or (not pocket-api--request-token) force)
+    (let* ((response (pocket-api--request 'oauth/request
+                       :no-auth t :sync t
+                       :data (list :redirect_uri "http://www.google.com")))
+           (data (request-response-data response))
+           (token (alist-get 'code data)))
+      (unless token
+        (error "Unable to get request token: %s" response))
+      (setq pocket-api--request-token token)))
+  pocket-api--request-token)
 
-;; once the request token is a-gotten,
-;; and you've gone to the oauth/authorize page
-;; and and done that, this will then get the
-;; all-important access-token, huzzah!
-(defun pocket-api-get-access-token ()
-  "After authorizing, pocket-api-authorize again to call this and get an access-token."
-  (pocket-api--post pocket-api-oauth-authorize-url
-                    `(("consumer_key" . ,pocket-api-consumer-key)
-                      ("code" . ,pocket-api-request-token))
-                    (lambda (data)
-                      (setq pocket-api-access-token-and-username data)
-                      (pocket-api-save-auth pocket-api-access-token-and-username
-                                            pocket-api-auth-file)
-                      (display-message-or-buffer
-                       "access a-gotten!"))))
+(cl-defun pocket-api--access-token (request-token &key force)
+  "Return access token retrieved with REQUEST-TOKEN.
+If FORCE is non-nil, get a new token."
+  (if (or (null pocket-api--access-token)
+          force)
+      (progn
+        (if (and pocket-api--access-token-have-opened-browser
+                 (not force))
+            ;; Already authorized in browser; try to get token
+            (let ((response (pocket-api--request 'oauth/authorize
+                              :data (list :code request-token)
+                              :no-auth t :sync t)))
+              (or (request-response-data response)
+                  (error "Unable to get access token: %s" response)))
+          ;; Not authorized yet, or forcing; browse to authorize
+          ;; FIXME: Is this a nice way to do this?
+          (let ((url (concat "https://getpocket.com/auth/authorize?request_token=" request-token)))
+            ;; NOTE: Doing it in w3m doesn't seem to work.  It only
+            ;;  seems to work in a regular browser, and then only when
+            ;;  the user is logged out of Pocket when he accesses the
+            ;;  auth URL.  (browse-url url)
+            (kill-new url))
+          (setq pocket-api--access-token-have-opened-browser t)
+          (error "Please go to the URL in the clipboard to  authorize the token request, then try again")))))
 
-;; we don't have a request token yet, so request
-;; one, then send the user to oauth/authorize for
-;; to authorize this shiz
-(defun pocket-api-get-request-token ()
-  "Request a request token, then direct the user to authorization URL"
-  (pocket-api--post pocket-api-oauth-request-url
-                    `(("consumer_key" . ,pocket-api-consumer-key)
-                      ("redirect_uri" . "http://www.google.com" ))
-                    (lambda (data)
-                      (let* ((token (cdr (assoc 'code data)))
-                             (url (concat "https://getpocket.com/auth/authorize?request_token=" token)))
-                        (setq pocket-api-request-token token)
-                        (kill-new url)
-                        (display-message-or-buffer
-                         (concat "authorize pocket-api at " url
-                                 " (copied to clipboard)\n"))
-                        (browse-url url))
-                      ;; (pocket-api-authorize)
-                      )))
+(defun pocket-api--reset-auth ()
+  "Reset all auth variables."
+  (setq pocket-api--request-token nil
+        pocket-api--access-token nil
+        pocket-api--access-token-have-opened-browser nil)
+  (with-temp-file pocket-api-token-file
+    nil))
 
-;;;###autoload
-(cl-defun pocket-api-get (&key (offset 1) (count 10))
-  "Gets things from your pocket."
-  (unless (pocket-api-access-granted-p)
-    (pocket-api-authorize))
-  (let ((offset (number-to-string offset))
-        (count (number-to-string count)))
-    (request-response-data  (pocket-api--post  "https://getpocket.com/v3/get"
-                                               `(("consumer_key" . ,pocket-api-consumer-key)
-                                                 ("access_token" . ,(cdr (assoc 'access_token pocket-api-access-token-and-username)))
-                                                 ("offset" . ,offset)
-                                                 ("count" . ,count)
-                                                 ("detailType" . "simple"))
-                                               (lambda (data)
-                                                 data)
-                                               :sync t))))
+;;;;; Methods
 
-;;;###autoload
-(defun pocket-api-add (url-to-add)
-  "Add URL-TO-ADD to your pocket."
-  (interactive (list (read-string "pocket-api url: ")))
-  (unless (pocket-api-access-granted-p)
-    (pocket-api-authorize))
-  (pocket-api--post  "https://getpocket.com/v3/add"
-                     `(("consumer_key" . ,pocket-api-consumer-key)
-                       ("access_token" . ,(cdr (assoc 'access_token pocket-api-access-token-and-username)))
-                       ("url" . ,url-to-add))
-                     (lambda (data)
-                       data)))
-
-(defun pocket-api-send-basic-action (action item_id)
-  "Modify the item which specified by ITEM-ID.
-
-ACTION only support basic actions which means add,archive,readd,favorite,unfavorite,delete"
-  (unless (pocket-api-access-granted-p)
-    (pocket-api-authorize))
-  (let ((actions (vector `((action . ,action)
-                           (item_id . ,item_id)))))
-    (request-response-data (pocket-api--post "https://getpocket.com/v3/send"
-                                             `(("consumer_key" . ,pocket-api-consumer-key)
-                                               ("access_token" . ,(cdr (assoc 'access_token pocket-api-access-token-and-username)))
-                                               ("actions" . ,actions))
-                                             (lambda (data)
-                                               data)))))
-
-;;;###autoload
-(defun pocket-api-archive (item_id)
-  "Archive item which specified by ITEM_ID"
-  (interactive (list (read-number "pocket-api item_id: ")))
-  (pocket-api-send-basic-action 'archive item_id))
-
-;;;###autoload
-(defun pocket-api-readd (item_id)
-  "Readd item which specified by ITEM_ID"
-  (interactive (list (read-number "pocket-api item_id: ")))
-  (pocket-api-send-basic-action 'readd item_id))
-
-;;;###autoload
-(defun pocket-api-favorite (item_id)
-  "Favorite item which specified by ITEM_ID"
-  (interactive (list (read-number "pocket-api item_id: ")))
-  (pocket-api-send-basic-action 'favorite item_id))
-
-;;;###autoload
-(defun pocket-api-unfavorite (item_id)
-  "Unfavorite item which specified by ITEM_ID"
-  (interactive (list (read-number "pocket-api item_id: ")))
-  (pocket-api-send-basic-action 'unfavorite item_id))
-
-;;;###autoload
-(defun pocket-api-delete (item_id)
-  "Delete item which specified by ITEM_ID"
-  (interactive (list (read-number "pocket-api item_id: ")))
-  (pocket-api-send-basic-action 'delete item_id))
-
-
-;; (dolist (action '("archive" "readd" "favorite" "unfavorite" "delete"))
-;;   (let ((fn-symbol (intern (format "pocket-api-%s" action))))
-;;     (fset fn-symbol (lambda (item_id)
-;;                       (pocket-api-send-basic-action action item_id)))))
-
-;; (pocket-api-get)
-;; (pocket-api-send-basic-action 'readd 271799625)
-
-(cl-defun pocket-api--request (endpoint &key data sync)
+(cl-defun pocket-api--request (endpoint &key data sync no-auth)
   "Return request response struct for an API request to \"https://getpocket/com/v3/ENDPOINT\".
 
 ENDPOINT may be a string or symbol, e.g. `get'.  DATA should be a
@@ -258,18 +168,19 @@ The consumer key and access token are included automatically.
 
 The response body is automatically parsed with `json-read'."
   (declare (indent defun))
-  (unless (pocket-api-access-granted-p)
-    (pocket-api-authorize))
-  (let ((endpoint (cl-typecase endpoint
-                    (symbol (symbol-name endpoint))
-                    (string endpoint)))
-        (data (json-encode
-               (pocket-api--plist-non-nil
-                (kvplist-merge (list :consumer_key pocket-api-consumer-key
-                                     :access_token (alist-get 'access_token
-                                                              pocket-api-access-token-and-username))
-                               data)))))
-    (request (concat "https://getpocket.com/v3/" endpoint)
+  (unless (or pocket-api--access-token no-auth)
+    (pocket-api--authorize))
+  (let* ((endpoint (cl-typecase endpoint
+                     (symbol (symbol-name endpoint))
+                     (string endpoint)))
+         (url (concat "https://getpocket.com/v3/" endpoint))
+         (data (json-encode
+                (pocket-api--plist-non-nil
+                 (kvplist-merge (list :consumer_key pocket-api-consumer-key
+                                      :access_token (alist-get 'access_token
+                                                               pocket-api--access-token))
+                                data)))))
+    (request url
              :type "POST"
              :headers pocket-api-default-extra-headers
              :data data
@@ -277,9 +188,11 @@ The response body is automatically parsed with `json-read'."
              :parser #'json-read
              :success (cl-function
                        (lambda (&key data &allow-other-keys)
-                         data)))))
-
-;;;;; Methods
+                         data))
+             :error (cl-function
+                     (lambda (&key data error-thrown symbol-status response &allow-other-keys)
+                       (error "Request error: URL:%s  DATA:%s  ERROR-THROWN:%s  SYMBOL-STATUS:%s  RESPONSE:%s"
+                              url data error-thrown symbol-status response))))))
 
 (cl-defun pocket-api--get (&key (offset 0) (count 10) (detail-type "simple")
                                 state favorite tag content-type sort
