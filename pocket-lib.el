@@ -223,7 +223,7 @@ it into a vector automatically. See
 
 ;;;;; Actions
 
-(defun pocket-lib--archive (&rest items)
+(defun pocket-lib-archive (&rest items)
   "Archive ITEMS."
   ;; MAYBE: Needs error handling...maybe.  It does give an error in
   ;; the minibuffer if the API command gives an error.

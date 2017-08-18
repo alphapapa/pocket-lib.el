@@ -18,7 +18,7 @@ Now you can use the library.
 ** Functions
 
 +  =pocket-lib-get=  Get items on the reading list.  Call with keyword arguments, as listed in the API docs, to get different kinds of items (e.g. archived, favorited, tagged).
-+  =pocket-lib--archive=  Archive one or more items.  Call with items retrieved with =pocket-lib-get=.
++  =pocket-lib-archive=  Archive one or more items.  Call with items retrieved with =pocket-lib-get=.
 
 * Credits
 
