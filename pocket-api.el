@@ -31,7 +31,7 @@
 
 ;;; Commentary:
 
-;; The usage is similar with [[https://github.com/pterygota/el-pocket][el-pocket]]. 
+;; The usage is similar with [[https://github.com/pterygota/el-pocket][el-pocket]].
 
 ;; The first time using `pocket-api', you should execute =pocket-api-authorize= twice.
 
@@ -134,14 +134,14 @@
 (defun pocket-api-get-access-token ()
   "After authorizing, pocket-api-authorize again to call this and get an access-token."
   (pocket-api--post pocket-api-oauth-authorize-url
-                   `(("consumer_key" . ,pocket-api-consumer-key)
-                     ("code" . ,pocket-api-request-token))
-                   (lambda (data)
-                     (setq pocket-api-access-token-and-username data)
-                     (pocket-api-save-auth pocket-api-access-token-and-username
-                                           pocket-api-auth-file)
-                     (display-message-or-buffer
-                      "access a-gotten!"))))
+                    `(("consumer_key" . ,pocket-api-consumer-key)
+                      ("code" . ,pocket-api-request-token))
+                    (lambda (data)
+                      (setq pocket-api-access-token-and-username data)
+                      (pocket-api-save-auth pocket-api-access-token-and-username
+                                            pocket-api-auth-file)
+                      (display-message-or-buffer
+                       "access a-gotten!"))))
 
 ;; we don't have a request token yet, so request
 ;; one, then send the user to oauth/authorize for
@@ -149,19 +149,19 @@
 (defun pocket-api-get-request-token ()
   "Request a request token, then direct the user to authorization URL"
   (pocket-api--post pocket-api-oauth-request-url
-                   `(("consumer_key" . ,pocket-api-consumer-key)
-                     ("redirect_uri" . "http://www.google.com" ))
-                   (lambda (data)
-                     (let* ((token (cdr (assoc 'code data)))
-                            (url (concat "https://getpocket.com/auth/authorize?request_token=" token)))
-                       (setq pocket-api-request-token token)
-                       (kill-new url)
-                       (display-message-or-buffer
-                        (concat "authorize pocket-api at " url
-                                " (copied to clipboard)\n"))
-                       (browse-url url))
-                     ;; (pocket-api-authorize)
-                     )))
+                    `(("consumer_key" . ,pocket-api-consumer-key)
+                      ("redirect_uri" . "http://www.google.com" ))
+                    (lambda (data)
+                      (let* ((token (cdr (assoc 'code data)))
+                             (url (concat "https://getpocket.com/auth/authorize?request_token=" token)))
+                        (setq pocket-api-request-token token)
+                        (kill-new url)
+                        (display-message-or-buffer
+                         (concat "authorize pocket-api at " url
+                                 " (copied to clipboard)\n"))
+                        (browse-url url))
+                      ;; (pocket-api-authorize)
+                      )))
 
 ;;;###autoload
 (cl-defun pocket-api-get (&key (offset 1) (count 10))
