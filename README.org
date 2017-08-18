@@ -1,4 +1,4 @@
-* pocket-lib
+* pocket-lib.el
 
 This is a simple library for accessing the [[https://getpocket.com/developer/docs/v3/][getpocket.com API]].  It is in alpha status at the moment, only supporting =get= and =archive= functions.
 

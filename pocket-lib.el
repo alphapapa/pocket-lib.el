@@ -108,7 +108,7 @@ If no token exists, or if FORCE is non-nil, get a new token."
                        :data (list :redirect_uri "http://www.example.com")
                        ;; Sync is required here, otherwise there won't
                        ;; be a response when we try to parse it
-                       :no-auth t :sync t))
+                       :sync t :no-auth t))
            (data (request-response-data response))
            (token (alist-get 'code data)))
       (unless token
@@ -129,7 +129,7 @@ If FORCE is non-nil, get a new token."
                               :data (list :code request-token)
                               ;; Sync is required here, otherwise there won't
                               ;; be a response when we try to parse it
-                              :no-auth t :sync t)))
+                              :sync t :no-auth t)))
               (or (request-response-data response)
                   (error "Unable to get access token: %s" response)))
           ;; Not authorized yet, or forcing; browse to authorize
@@ -202,6 +202,7 @@ Without any arguments, this simply returns the first 10
 unarchived, unfavorited, untagged items in the user's list.  Keys
 set to nil will not be sent in the request.  See
 <https://getpocket.com/developer/docs/v3/retrieve>."
+  (declare (indent defun))
   (let ((offset (number-to-string offset))
         (count (number-to-string count))
         (data (list :offset offset :count count :detail-type detail-type
@@ -210,16 +211,19 @@ set to nil will not be sent in the request.  See
                     :search search :domain domain :since since)))
     (request-response-data
      (pocket-lib--request 'get
-                          :data data :sync t))))
+       :data data
+       :sync t))))
 
 (cl-defun pocket-lib--send (actions)
   "Return JSON response for a \"send\" API request containing ACTIONS.
 ACTIONS should be a list of actions; this function will convert
 it into a vector automatically. See
 <https://getpocket.com/developer/docs/v3/modify>."
+  (declare (indent defun))
   (request-response-data
    (pocket-lib--request 'send
-                        :data (list :actions (vconcat actions)) :sync t)))
+     :data (list :actions (vconcat actions))
+     :sync t)))
 
 ;;;;; Actions
 
@@ -227,9 +231,10 @@ it into a vector automatically. See
   "Archive ITEMS."
   ;; MAYBE: Needs error handling...maybe.  It does give an error in
   ;; the minibuffer if the API command gives an error.
-  (pocket-lib--send (--map (list :action "archive"
-                                 :item_id (alist-get 'item_id it))
-                           items)))
+  (pocket-lib--send
+    (--map (list :action "archive"
+                 :item_id (alist-get 'item_id it))
+           items)))
 
 ;;;;; Helpers
 
