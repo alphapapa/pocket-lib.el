@@ -48,6 +48,8 @@
 (require 'json)
 (require 'request)
 
+(require 'kv)
+
 ;;various mouse-eared items
 (defgroup pocket-api nil
   "Pocket"
@@ -243,6 +245,68 @@ ACTION only support basic actions which means add,archive,readd,favorite,unfavor
 
 ;; (pocket-api-get)
 ;; (pocket-api-send-basic-action 'readd 271799625)
+
+(cl-defun pocket-api--request (endpoint &key data sync)
+  "Return request response struct for an API request to \"https://getpocket/com/v3/ENDPOINT\".
+
+ENDPOINT may be a string or symbol, e.g. `get'.  DATA should be a
+plist of API parameters.  SYNC is passed to `request''s `:sync'
+keyword.
+
+The consumer key and access token are included automatically.
+
+The response body is automatically parsed with `json-read'."
+  (declare (indent defun))
+  (unless (pocket-api-access-granted-p)
+    (pocket-api-authorize))
+  (let ((endpoint (cl-typecase endpoint
+                    (symbol (symbol-name endpoint))
+                    (string endpoint)))
+        (data (pocket-api--plist-non-nil
+               (kvplist-merge (list :consumer_key pocket-api-consumer-key
+                                    :access_token (alist-get 'access_token
+                                                             pocket-api-access-token-and-username))
+                              data))))
+    (request (concat "https://getpocket.com/v3/" endpoint)
+             :type "POST"
+             :headers pocket-api-default-extra-headers
+             :data (json-encode data)
+             :sync sync
+             :parser #'json-read
+             :success (cl-function
+                       (lambda (&key data &allow-other-keys)
+                         data)))))
+
+(cl-defun pocket-api--get (&key (offset 0) (count 10) (detail-type "simple")
+                                state favorite tag content-type sort
+                                search domain since)
+  "Return JSON response for a \"get\" API request.
+
+By default, OFFSET is 0, COUNT is 10, and DETAIL-TYPE is
+\"simple\".  All other keys are unset by default.  Keys set to
+nil will not be sent in the request.
+
+See <https://getpocket.com/developer/docs/v3/retrieve>."
+
+  (let ((offset (number-to-string offset))
+        (count (number-to-string count))
+        (data (list :offset offset :count count :detail-type detail-type
+                    :state state :favorite favorite :tag tag
+                    :content-type content-type :sort sort
+                    :search search :domain domain :since since)))
+    (request-response-data
+     (pocket-api--request 'get
+       :data data :sync t))))
+
+;;;;; Helpers
+
+(defun pocket-api--plist-non-nil (plist)
+  "Return PLIST without key-value pairs whose value is nil."
+  (cl-loop for (key value) on plist by #'cddr
+           unless (null value)
+           append (list key value)))
+
+;;;; Footer
 
 (provide 'pocket-api)
 
