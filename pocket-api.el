@@ -263,15 +263,16 @@ The response body is automatically parsed with `json-read'."
   (let ((endpoint (cl-typecase endpoint
                     (symbol (symbol-name endpoint))
                     (string endpoint)))
-        (data (pocket-api--plist-non-nil
-               (kvplist-merge (list :consumer_key pocket-api-consumer-key
-                                    :access_token (alist-get 'access_token
-                                                             pocket-api-access-token-and-username))
-                              data))))
+        (data (json-encode
+               (pocket-api--plist-non-nil
+                (kvplist-merge (list :consumer_key pocket-api-consumer-key
+                                     :access_token (alist-get 'access_token
+                                                              pocket-api-access-token-and-username))
+                               data)))))
     (request (concat "https://getpocket.com/v3/" endpoint)
              :type "POST"
              :headers pocket-api-default-extra-headers
-             :data (json-encode data)
+             :data data
              :sync sync
              :parser #'json-read
              :success (cl-function
