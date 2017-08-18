@@ -318,7 +318,7 @@ See <https://getpocket.com/developer/docs/v3/modify>."
   ;; the minibuffer if the API command gives an error.
   (pocket-api--send (vconcat
                      (--map (list :action "archive"
-                                  :item_id (string-to-number (alist-get 'item_id it)))
+                                  :item_id (alist-get 'item_id it))
                             items))))
 
 ;;;;; Helpers
