@@ -58,7 +58,7 @@
 ;;;;; Customization
 
 (defgroup pocket-lib nil
-  "Pocket"
+  "Library for accessing GetPocket.com API."
   :group 'external)
 
 (defcustom pocket-lib-consumer-key "30410-da1b34ce81aec5843a2214f4"
@@ -66,7 +66,7 @@
   :type 'string)
 
 (defcustom pocket-lib-token-file (expand-file-name "~/.cache/emacs-pocket-lib-token.json")
-  "Pocket API token stored in this file."
+  "Pocket access token is stored in this file."
   :type 'file)
 
 ;;;; Functions
