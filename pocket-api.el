@@ -340,6 +340,6 @@ See <https://getpocket.com/developer/docs/v3/retrieve>."
 
 ;;;; Footer
 
-(provide 'pocket-api)
+(provide 'ap/pocket-api)
 
 ;;; pocket-api.el ends here
