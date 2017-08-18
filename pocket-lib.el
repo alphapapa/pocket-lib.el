@@ -139,8 +139,10 @@ If FORCE is non-nil, get a new token."
           (setq pocket-lib--access-token-have-opened-browser t)
           (error "Please go to the URL in the clipboard to authorize the token request, then try again")))))
 
-(defun pocket-lib--reset-auth ()
-  "Reset all auth variables."
+(defun pocket-lib-reset-auth ()
+  "Reset all saved auth tokens.
+This should not be necessary unless something has gone wrong."
+  (interactive)
   (setq pocket-lib--request-token nil
         pocket-lib--access-token nil
         pocket-lib--access-token-have-opened-browser nil)
