@@ -156,7 +156,7 @@ This should not be necessary unless something has gone wrong."
 ;;;;; Methods
 
 (cl-defun pocket-lib--request (endpoint &key data sync no-auth)
-  "Return request response struct for an API request to \"https://getpocket/com/v3/ENDPOINT\".
+  "Return response struct for an API request to <https://getpocket/com/v3/ENDPOINT>.
 
 ENDPOINT may be a string or symbol, e.g. `get'.  DATA should be a
 plist of API parameters; keys with nil values are removed.  SYNC
@@ -198,15 +198,10 @@ The response body is automatically parsed with `json-read'."
                                state favorite tag content-type sort
                                search domain since)
   "Return JSON response for a \"get\" API request.
-
 Without any arguments, this simply returns the first 10
-unarchived, unfavorited, untagged items in the user's list.
-
-By default, OFFSET is 0, COUNT is 10, and DETAIL-TYPE is
-\"simple\".  All other keys are unset by default.  Keys set to
-nil will not be sent in the request.
-
-See <https://getpocket.com/developer/docs/v3/retrieve>."
+unarchived, unfavorited, untagged items in the user's list.  Keys
+set to nil will not be sent in the request.  See
+<https://getpocket.com/developer/docs/v3/retrieve>."
   (let ((offset (number-to-string offset))
         (count (number-to-string count))
         (data (list :offset offset :count count :detail-type detail-type
@@ -220,9 +215,8 @@ See <https://getpocket.com/developer/docs/v3/retrieve>."
 (cl-defun pocket-lib--send (actions)
   "Return JSON response for a \"send\" API request containing ACTIONS.
 ACTIONS should be a list of actions; this function will convert
-it into a vector automatically.
-
-See <https://getpocket.com/developer/docs/v3/modify>."
+it into a vector automatically. See
+<https://getpocket.com/developer/docs/v3/modify>."
   (request-response-data
    (pocket-lib--request 'send
                         :data (list :actions (vconcat actions)) :sync t)))
