@@ -77,12 +77,12 @@
 (cl-defun pocket-lib--authorize (&key force)
   "Get and save authorization token.
 If token already exists, don't get a new one, unless FORCE is non-nil."
-  (when (or (null pocket-lib--access-token) force)
+  (when (or (null pocket-lib--access-token)
+            force)
     (unless force
       ;; Try to load from file
       (pocket-lib--load-access-token))
-    (when (or (null pocket-lib--access-token)
-              force)
+    (when (or (null pocket-lib--access-token) force)
       ;; Get new token
       (if-let ((request-token (pocket-lib--request-token :force force))
                (access-token (pocket-lib--access-token request-token :force force)))
@@ -104,7 +104,8 @@ If token already exists, don't get a new one, unless FORCE is non-nil."
 (cl-defun pocket-lib--request-token (&key force)
   "Return request token.
 If no token exists, or if FORCE is non-nil, get a new token."
-  (when (or (not pocket-lib--request-token) force)
+  (when (or (not pocket-lib--request-token)
+            force)
     (let* ((response (pocket-lib--request 'oauth/request
                        :data (list :redirect_uri "http://www.example.com")
                        ;; Sync is required here, otherwise there won't
