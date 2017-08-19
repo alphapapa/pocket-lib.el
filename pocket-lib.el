@@ -227,14 +227,22 @@ it into a vector automatically. See
 
 ;;;;; Actions
 
+(defun pocket-lib--action (action &rest items)
+  "Execute ACTION on ITEMS.
+Action may be a symbol or a string."
+  (let ((action (cl-typecase action
+                  (string action)
+                  (symbol (symbol-name action)))))
+    (pocket-lib--send
+     (--map (list :action action
+                  :item_id (alist-get 'item_id it))
+            items))))
+
 (defun pocket-lib-archive (&rest items)
   "Archive ITEMS."
   ;; MAYBE: Needs error handling...maybe.  It does give an error in
   ;; the minibuffer if the API command gives an error.
-  (pocket-lib--send
-    (--map (list :action "archive"
-                 :item_id (alist-get 'item_id it))
-           items)))
+  (apply #'pocket-lib--action 'archive items))
 
 ;;;;; Helpers
 
