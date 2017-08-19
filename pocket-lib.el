@@ -96,7 +96,7 @@ If token already exists, don't get a new one, unless FORCE is non-nil."
                                      (json-read-file pocket-lib-token-file)))))
 
 (defun pocket-lib--save-access-token (token)
-  "Write TOKEN to `pocket-lib-auth-file' and set variable."
+  "Write TOKEN to `pocket-lib-token-file' and set variable."
   (with-temp-file pocket-lib-token-file
     (insert (json-encode-alist token)))
   (setq pocket-lib--access-token token))
@@ -143,7 +143,7 @@ If FORCE is non-nil, get a new token."
             ;;  auth URL.  (browse-url url)
             (kill-new url))
           (setq pocket-lib--access-token-have-opened-browser t)
-          (error "Please go to the URL in the clipboard to authorize the token request, then try again")))))
+          (error "Please go to the URL in the clipboard/kill-ring to authorize `pocket-lib', then try again")))))
 
 (defun pocket-lib-reset-auth ()
   "Reset all saved auth tokens.
