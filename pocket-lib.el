@@ -51,9 +51,10 @@
 (defvar pocket-lib--access-token-have-opened-browser nil)
 (defvar pocket-lib--request-token nil)
 (defvar pocket-lib--access-token nil)
-(defconst pocket-lib-default-extra-headers '(("Host" . "getpocket.com")
-                                             ("Content-Type" . "application/json; charset=UTF-8")
-                                             ("X-Accept" . "application/json")))
+(defconst pocket-lib-default-extra-headers
+  '(("Host" . "getpocket.com")
+    ("Content-Type" . "application/json; charset=UTF-8")
+    ("X-Accept" . "application/json")))
 
 ;;;;; Customization
 
@@ -222,8 +223,8 @@ it into a vector automatically. See
   (declare (indent defun))
   (request-response-data
    (pocket-lib--request 'send
-     :data (list :actions (vconcat actions))
-     :sync t)))
+                        :data (list :actions (vconcat actions))
+                        :sync t)))
 
 ;;;;; Actions
 
