@@ -161,7 +161,8 @@ settings for tabulated-list-mode based on it.")
     (when (funcall pocket-reader-show-url-default-function url)
       ;; Item opened successfully
       (when pocket-reader-archive-on-open
-        (pocket-reader-archive)))))
+        (with-pocket-reader
+         (pocket-reader-archive))))))
 
 (defun pocket-reader-pop-to-url ()
   "Open URL of current item with default pop-to function."
@@ -170,23 +171,26 @@ settings for tabulated-list-mode based on it.")
     (when (funcall pocket-reader-pop-to-url-default-function url)
       ;; Item opened successfully
       (when pocket-reader-archive-on-open
-        (pocket-reader-archive)))))
+        (with-pocket-reader
+         (pocket-reader-archive))))))
 
 (defun pocket-reader-archive ()
   "Mark current item as read."
   (interactive)
   (when (pocket-reader--action 'archive)
     ;; Item successfully archived
-    (set-text-properties (line-beginning-position) (line-end-position)
-                         '(face pocket-reader-archived))))
+    (with-pocket-reader
+     (set-text-properties (line-beginning-position) (line-end-position)
+                          '(face pocket-reader-archived)))))
 
 (defun pocket-reader-readd ()
   "Mark current item as unread."
   (interactive)
   (when (pocket-reader--action 'readd)
     ;; Item successfully archived
-    (set-text-properties (line-beginning-position) (line-end-position)
-                         '(face pocket-reader-unread))))
+    (with-pocket-reader
+     (set-text-properties (line-beginning-position) (line-end-position)
+                          '(face pocket-reader-unread)))))
 
 (defun pocket-reader-favorite-toggle ()
   "Toggle current item's favorite status."
