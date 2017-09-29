@@ -175,8 +175,8 @@ settings for tabulated-list-mode based on it.")
   (when (pocket-reader--action 'archive)
     ;; Item successfully archived
     (with-pocket-reader
-     (set-text-properties (line-beginning-position) (line-end-position)
-                          '(face pocket-reader-archived)))))
+     (put-text-property (line-beginning-position) (line-end-position)
+                        'face 'pocket-reader-archived))))
 
 (defun pocket-reader-readd ()
   "Mark current item as unread."
@@ -184,8 +184,8 @@ settings for tabulated-list-mode based on it.")
   (when (pocket-reader--action 'readd)
     ;; Item successfully archived
     (with-pocket-reader
-     (set-text-properties (line-beginning-position) (line-end-position)
-                          '(face pocket-reader-unread)))))
+     (put-text-property (line-beginning-position) (line-end-position)
+                        'face 'pocket-reader-unread))))
 
 (defun pocket-reader-favorite-toggle ()
   "Toggle current item's favorite status."
