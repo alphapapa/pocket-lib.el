@@ -58,8 +58,8 @@
                     "TAB" pocket-reader-pop-to-url
                     "a" pocket-reader-toggle-archived
                     "u" pocket-reader-toggle-archived
-                    "*" pocket-reader-favorite-toggle
-                    "f" pocket-reader-favorite-toggle
+                    "*" pocket-reader-toggle-favorite
+                    "f" pocket-reader-toggle-favorite
                     "s" pocket-reader-search
                     "tt" pocket-reader-add-tags
                     "ta" pocket-reader-add-tags
@@ -232,7 +232,7 @@ settings for tabulated-list-mode based on it.")
         (with-pocket-reader
          (pocket-reader-toggle-archived))))))
 
-(defun pocket-reader-favorite-toggle ()
+(defun pocket-reader-toggle-favorite ()
   "Toggle current item's favorite status."
   (interactive)
   (let ((action (if (string-empty-p (elt (tabulated-list-get-entry) 1))
