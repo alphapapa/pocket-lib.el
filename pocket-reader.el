@@ -55,8 +55,8 @@
         (mappings '(
                     "RET" pocket-reader-show-url
                     "TAB" pocket-reader-pop-to-url
-                    "a" pocket-reader-archive
-                    "u" pocket-reader-readd
+                    "a" pocket-reader-toggle-archived
+                    "u" pocket-reader-toggle-archived
                     "*" pocket-reader-favorite-toggle
                     "f" pocket-reader-favorite-toggle
                     "s" pocket-reader-search
@@ -177,24 +177,6 @@ settings for tabulated-list-mode based on it.")
         (with-pocket-reader
          (pocket-reader-archive))))))
 
-(defun pocket-reader-archive ()
-  "Mark current item as read."
-  (interactive)
-  (when (pocket-reader--action 'archive)
-    ;; Item successfully archived
-    (with-pocket-reader
-     (put-text-property (line-beginning-position) (line-end-position)
-                        'face 'pocket-reader-archived))))
-
-(defun pocket-reader-readd ()
-  "Mark current item as unread."
-  (interactive)
-  (when (pocket-reader--action 'readd)
-    ;; Item successfully archived
-    (with-pocket-reader
-     (put-text-property (line-beginning-position) (line-end-position)
-                        'face 'pocket-reader-unread))))
-
 (defun pocket-reader-favorite-toggle ()
   "Toggle current item's favorite status."
   (interactive)
@@ -210,6 +192,32 @@ settings for tabulated-list-mode based on it.")
                                 (favorite "*")
                                 (unfavorite ""))
                               t))))
+
+(defun pocket-reader-toggle-archived ()
+  "Toggle current item's archived/unread status."
+  (interactive)
+  (let* ((action (if (equal "0" (pocket-reader-get-property :status))
+                     ;; Unread; archive
+                     'archive
+                   ;; Archived; readd
+                   'readd))
+         (face (cl-case action
+                 ('archive 'pocket-reader-archived)
+                 ('readd 'pocket-reader-unread)))
+         (status (cl-case action
+                   ('archive "1")
+                   ('readd "0")))
+         (title (elt (tabulated-list-get-entry) 2)))
+    (when (pocket-reader--action action)
+      ;; Item successfully toggled
+      (with-pocket-reader
+       (put-text-property 0 (length title)
+                          :status status
+                          title)
+       (tabulated-list-set-col 2 title)
+       ;; Set face last so it doesn't conflict with previous lines
+       (put-text-property (line-beginning-position) (line-end-position)
+                          'face face)))))
 
 (defun pocket-reader-search ()
   "Search Pocket items."
@@ -241,7 +249,7 @@ settings for tabulated-list-mode based on it.")
 ACTION should be a string or symbol which is the name of an
 action in the Pocket API."
   (with-pocket-reader
-   (let* ((id (string-to-number (pocket-reader-get-property 'tabulated-list-id)))
+   (let* ((id (string-to-number (tabulated-list-get-id)))
           (item (list (cons 'item_id id))))
      (pocket-lib--action action item))))
 
@@ -256,8 +264,7 @@ action in the Pocket API."
 
 (defun pocket-reader-get-property (property)
   "Return value of PROPERTY for current item."
-  (let ((pos (next-single-property-change (line-beginning-position) property nil (line-end-position))))
-    (get-text-property pos property)))
+  (get-text-property 0 property (elt (tabulated-list-get-entry) 2)))
 
 (cl-defun pocket-reader-list-entries (&optional &key search (state "unread") favorite)
   ;; This buffer-local variable specifies the entries displayed in the
