@@ -207,7 +207,7 @@ set to nil will not be sent in the request.  See
   (declare (indent defun))
   (let ((offset (number-to-string offset))
         (count (number-to-string count))
-        (data (list :offset offset :count count :detail-type detail-type
+        (data (list :offset offset :count count :detailType detail-type
                     :state state :favorite favorite :tag tag
                     :content-type content-type :sort sort
                     :search search :domain domain :since since)))
