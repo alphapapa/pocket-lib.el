@@ -220,7 +220,7 @@ settings for tabulated-list-mode based on it.")
       ;; Item opened successfully
       (when pocket-reader-archive-on-open
         (with-pocket-reader
-         (pocket-reader-archive))))))
+         (pocket-reader-toggle-archived))))))
 
 (defun pocket-reader-pop-to-url ()
   "Open URL of current item with default pop-to function."
@@ -230,7 +230,7 @@ settings for tabulated-list-mode based on it.")
       ;; Item opened successfully
       (when pocket-reader-archive-on-open
         (with-pocket-reader
-         (pocket-reader-archive))))))
+         (pocket-reader-toggle-archived))))))
 
 (defun pocket-reader-favorite-toggle ()
   "Toggle current item's favorite status."
