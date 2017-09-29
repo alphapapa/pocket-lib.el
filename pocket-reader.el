@@ -56,6 +56,8 @@
                     "TAB" pocket-reader-pop-to-url
                     "a" pocket-reader-archive
                     "u" pocket-reader-readd
+                    "*" pocket-reader-favorite-toggle
+                    "f" pocket-reader-favorite-toggle
                     )))
     (cl-loop for (key fn) on mappings by #'cddr
              do (define-key map (kbd key) fn))
@@ -173,26 +175,45 @@ settings for tabulated-list-mode based on it.")
 (defun pocket-reader-archive ()
   "Mark current item as read."
   (interactive)
-  (with-pocket-reader
-   (let* ((id (string-to-number (pocket-reader-get-property 'tabulated-list-id)))
-          (item (list (cons 'item_id id))))
-     (when (pocket-lib-archive item)
-       ;; Item successfully archived
-       (set-text-properties (line-beginning-position) (line-end-position)
-                            '(face pocket-reader-archived))))))
+  (when (pocket-reader--action 'archive)
+    ;; Item successfully archived
+    (set-text-properties (line-beginning-position) (line-end-position)
+                         '(face pocket-reader-archived))))
 
 (defun pocket-reader-readd ()
   "Mark current item as unread."
   (interactive)
+  (when (pocket-reader--action 'readd)
+    ;; Item successfully archived
+    (set-text-properties (line-beginning-position) (line-end-position)
+                         '(face pocket-reader-unread))))
+
+(defun pocket-reader-favorite-toggle ()
+  "Toggle current item's favorite status."
+  (interactive)
+  (let ((action (if (string-empty-p (elt (tabulated-list-get-entry) 1))
+                    ;; Not favorited; add it
+                    'favorite
+                  ;; Favorited; remove it
+                  'unfavorite)))
+    (when (pocket-reader--action action)
+      ;; Item successfully toggled
+      (tabulated-list-set-col 1
+                              (cl-case action
+                                (favorite "*")
+                                (unfavorite ""))
+                              t))))
+
+;;;;; Helpers
+
+(defun pocket-reader--action (action)
+  "Execute ACTION on current item.
+ACTION should be a string or symbol which is the name of an
+action in the Pocket API."
   (with-pocket-reader
    (let* ((id (string-to-number (pocket-reader-get-property 'tabulated-list-id)))
           (item (list (cons 'item_id id))))
-     (when (pocket-lib-readd item)
-       ;; Item successfully archived
-       (set-text-properties (line-beginning-position) (line-end-position)
-                            '(face pocket-reader-unread))))))
-
-;;;;; Helpers
+     (pocket-lib--action action item))))
 
 (defun pocket-reader--set-tabulated-settings ()
   (let* ((site-width (cl-loop for item in pocket-reader-items
