@@ -246,6 +246,12 @@ Action may be a symbol or a string."
   ;; the minibuffer if the API command gives an error.
   (apply #'pocket-lib--action 'archive items))
 
+(defun pocket-lib-readd (&rest items)
+  "Readd ITEMS."
+  ;; MAYBE: Needs error handling...maybe.  It does give an error in
+  ;; the minibuffer if the API command gives an error.
+  (apply #'pocket-lib--action 'readd items))
+
 ;;;;; Helpers
 
 (defun pocket-lib--plist-non-nil (plist)
