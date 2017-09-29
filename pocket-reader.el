@@ -108,6 +108,13 @@ settings for tabulated-list-mode based on it.")
      (let ((inhibit-read-only t))
        ,@body)))
 
+(defun pocket-reader--keywords-in-list (list &rest keywords)
+  "If any KEYWORDS are in LIST, destructively remove them from LIST and return the last KEYWORD found in LIST."
+  (car (last (cl-loop for keyword in keywords
+                      when (member keyword list)
+                      do (delete keyword list)
+                      and collect (s-replace (rx ":") "" keyword)))))
+
 ;;;; Mode
 
 (define-derived-mode pocket-reader-mode tabulated-list-mode
@@ -208,12 +215,11 @@ settings for tabulated-list-mode based on it.")
   "Search Pocket items."
   (interactive)
   (let* ((query-words (s-split " " (read-from-minibuffer "Query: ")))
-         (state (car (last (cl-loop for keyword in '(":archive" ":all" ":unread")
-                                    when (member keyword query-words)
-                                    do (delete keyword query-words)
-                                    and collect (s-replace (rx ":") "" keyword)))))
+         (state (pocket-reader--keywords-in-list query-words ":archive" ":all" ":unread"))
+         (favorite (when (pocket-reader--keywords-in-list query-words ":favorite" ":*")
+                     1))
          (query (s-join " " query-words)))
-    (setq tabulated-list-entries (pocket-reader-list-entries :search query :state state))
+    (setq tabulated-list-entries (pocket-reader-list-entries :search query :state state :favorite favorite))
     (tabulated-list-revert)
     (pocket-reader-apply-faces)))
 
@@ -253,7 +259,7 @@ action in the Pocket API."
   (let ((pos (next-single-property-change (line-beginning-position) property nil (line-end-position))))
     (get-text-property pos property)))
 
-(cl-defun pocket-reader-list-entries (&optional &key search (state "unread"))
+(cl-defun pocket-reader-list-entries (&optional &key search (state "unread") favorite)
   ;; This buffer-local variable specifies the entries displayed in the
   ;; Tabulated List buffer.  Its value should be either a list, or a
   ;; function.
@@ -278,7 +284,8 @@ action in the Pocket API."
   (let* ((items (cdr (cl-third (pocket-lib-get
                                  :count pocket-reader-show-count
                                  :search search
-                                 :state state))))
+                                 :state state
+                                 :favorite favorite))))
          (item-plists (--map (cl-loop with item = (kvalist->plist (cdr it))
                                       for key in pocket-reader-keys
                                       for val = (plist-get item key)
