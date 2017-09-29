@@ -240,6 +240,22 @@ Action may be a symbol or a string."
                   :item_id (alist-get 'item_id it))
             items))))
 
+(cl-defun pocket-lib-add-urls (&rest urls &key tags &allow-other-keys)
+  "Add URLs to Pocket.
+TAGS may be a list of strings or nil."
+  (let (cur url-list)
+    (while (setq cur (pop urls))
+      (if (keywordp cur)
+          (set (intern-soft (substring (symbol-name cur) 1))
+               (pop urls))
+        (push cur url-list)))
+    (nreverse url-list)
+    (pocket-lib--send
+      (--map (list :action 'add
+                   :url it
+                   :tags tags)
+             url-list))))
+
 (defun pocket-lib-archive (&rest items)
   "Archive ITEMS."
   ;; MAYBE: Needs error handling...maybe.  It does give an error in
