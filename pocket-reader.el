@@ -52,7 +52,7 @@
 ;;;; Variables
 
 (defvar pocket-reader-mode-map
-  (let ((map (make-keymap))
+  (let ((map (make-sparse-keymap))
         (mappings '(
                     "RET" pocket-reader-show-url
                     "TAB" pocket-reader-pop-to-url
