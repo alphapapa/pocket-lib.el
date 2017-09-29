@@ -138,7 +138,7 @@ settings for tabulated-list-mode based on it.")
   '(:item_id
     :status
     :favorite
-    :tags
+    (:tags . pocket-lib--process-tags)
     :time_added
     :time_updated
     :time_read
@@ -372,15 +372,23 @@ action in the Pocket API."
                                  :favorite favorite))))
          (item-plists (--map (cl-loop with item = (kvalist->plist (cdr it))
                                       for key in pocket-reader-keys
-                                      for val = (plist-get item key)
+                                      for fn = nil
+                                      when (consp key)
+                                      do (setq fn (cdr key)
+                                               key (car key))
+                                      for val = (if fn
+                                                    (funcall fn (plist-get item key))
+                                                  (plist-get item key))
                                       when val
                                       append (list key val))
                              items)))
     (cl-loop for it in item-plists
              for title = (pocket-reader--not-empty-string (apply #'propertize (plist-get it :resolved_title)
                                                                  (cl-loop for key in pocket-reader-keys
+                                                                          when (consp key)
+                                                                          do (setq key (car key))
                                                                           append (list key (plist-get it key)))))
-             for tags = (pocket-reader--not-empty-string (s-join "," (pocket-lib--process-tags (plist-get it :tags))))
+             for tags = (pocket-reader--not-empty-string (s-join "," (plist-get it :tags)))
              collect (list (plist-get it :item_id)
                            (vector (pocket-reader--format-timestamp (string-to-number (plist-get it :time_added)))
                                    (pocket-reader--favorited-to-display (plist-get it :favorite))
