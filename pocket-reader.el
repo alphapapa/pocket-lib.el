@@ -58,6 +58,7 @@
                     "u" pocket-reader-readd
                     "*" pocket-reader-favorite-toggle
                     "f" pocket-reader-favorite-toggle
+                    "s" pocket-reader-search
                     )))
     (cl-loop for (key fn) on mappings by #'cddr
              do (define-key map (kbd key) fn))
@@ -122,6 +123,7 @@ settings for tabulated-list-mode based on it.")
 
 (defconst pocket-reader-keys
   '(:item_id
+    :status
     :favorite
     :time_added
     :time_updated
@@ -141,14 +143,7 @@ settings for tabulated-list-mode based on it.")
   (tabulated-list-print 'remember-pos 'update)
 
   ;; Apply face
-  ;; TODO: Should probably do this with a custom print function
-  (with-pocket-reader
-   (goto-char (point-min))
-   (while (not (eobp))
-     (add-text-properties (line-beginning-position) (line-end-position)
-                          '(face pocket-reader-unread))
-     (forward-line 1))
-   (goto-char (point-min))))
+  (pocket-reader-apply-faces))
 
 ;;;; Functions
 
@@ -208,7 +203,26 @@ settings for tabulated-list-mode based on it.")
                                 (unfavorite ""))
                               t))))
 
+(defun pocket-reader-search ()
+  "Search Pocket items."
+  (interactive)
+  (when-let ((query (read-from-minibuffer "Query: ")))
+    (setq tabulated-list-entries (pocket-reader-list-entries :search query))
+    (tabulated-list-revert)
+    (pocket-reader-apply-faces)))
+
 ;;;;; Helpers
+
+(defun pocket-reader-apply-faces ()
+  ;; TODO: Maybe we should use a custom print function but this is simpler
+  (with-pocket-reader
+   (goto-char (point-min))
+   (while (not (eobp))
+     (when (equal "0" (pocket-reader-get-property :status))
+       (add-text-properties (line-beginning-position) (line-end-position)
+                            '(face pocket-reader-unread)))
+     (forward-line 1))
+   (goto-char (point-min))))
 
 (defun pocket-reader--action (action)
   "Execute ACTION on current item.
@@ -233,7 +247,7 @@ action in the Pocket API."
   (let ((pos (next-single-property-change (line-beginning-position) property nil (line-end-position))))
     (get-text-property pos property)))
 
-(defun pocket-reader-list-entries ()
+(defun pocket-reader-list-entries (&optional &key search)
   ;; This buffer-local variable specifies the entries displayed in the
   ;; Tabulated List buffer.  Its value should be either a list, or a
   ;; function.
@@ -255,7 +269,9 @@ action in the Pocket API."
   ;;   There should be no newlines in any of these strings.
 
   ;; FIXME: Add error handling.
-  (let* ((items (cdr (cl-third (pocket-lib-get :count pocket-reader-show-count))))
+  (let* ((items (cdr (cl-third (pocket-lib-get
+                                 :count pocket-reader-show-count
+                                 :search search))))
          (item-plists (--map (cl-loop with item = (kvalist->plist (cdr it))
                                       for key in pocket-reader-keys
                                       for val = (plist-get item key)
@@ -263,8 +279,9 @@ action in the Pocket API."
                                       append (list key val))
                              items)))
     (cl-loop for it in item-plists
-             for title = (propertize (plist-get it :resolved_title)
-                                     :resolved_url (plist-get it :resolved_url))
+             for title = (apply #'propertize (plist-get it :resolved_title)
+                                (cl-loop for key in pocket-reader-keys
+                                         append (list key (plist-get it key))))
              collect (list (plist-get it :item_id)
                            (vector (pocket-reader--format-timestamp (string-to-number (plist-get it :time_added)))
                                    (pocket-reader--favorited-to-display (plist-get it :favorite))
