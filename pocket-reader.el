@@ -41,6 +41,7 @@
 
 (require 'cl-lib)
 (require 'url-parse)
+(require 'seq)
 
 (require 'dash)
 (require 'kv)
@@ -60,6 +61,10 @@
                     "*" pocket-reader-favorite-toggle
                     "f" pocket-reader-favorite-toggle
                     "s" pocket-reader-search
+                    "tt" pocket-reader-add-tags
+                    "ta" pocket-reader-add-tags
+                    "tr" pocket-reader-remove-tags
+                    "ts" pocket-reader-set-tags
                     )))
     (cl-loop for (key fn) on mappings by #'cddr
              do (define-key map (kbd key) fn))
@@ -133,6 +138,7 @@ settings for tabulated-list-mode based on it.")
   '(:item_id
     :status
     :favorite
+    :tags
     :time_added
     :time_updated
     :time_read
@@ -156,6 +162,56 @@ settings for tabulated-list-mode based on it.")
 ;;;; Functions
 
 ;;;;; Commands
+
+(defun pocket-reader-add-tags ()
+  "Add tags to current item."
+  (interactive)
+  (let ((item (pocket-reader--current-item))
+        (new-tags (--> (read-from-minibuffer "Tags: ")
+                       (s-split " " it 'omit-nulls)
+                       (s-join "," it)))
+        (old-tags (pocket-reader-get-property :tags)))
+    (when (and new-tags
+               (pocket-lib--tags-action 'tags_add new-tags item))
+      ;; Tags added successfully
+      (pocket-reader--set-entry-property :tags (append (s-split "," new-tags)
+                                                       old-tags))
+      (pocket-reader--set-tags-column)
+      ;; Fix face
+      (pocket-reader--apply-faces-to-line))))
+
+(defun pocket-reader-remove-tags ()
+  "Remove tags from current item."
+  (interactive)
+  (let* ((item (pocket-reader--current-item))
+         (old-tags (pocket-reader-get-property :tags))
+         (remove-tags (--> (completing-read "Tags: " old-tags)
+                           (s-split " " it 'omit-nulls)))
+         (remove-tags-string (s-join "," remove-tags))
+         (new-tags (or (seq-difference old-tags remove-tags)
+                       '(" "))))
+    (when (and remove-tags
+               (pocket-lib--tags-action 'tags_remove remove-tags-string item))
+      ;; Tags removed successfully
+      (pocket-reader--set-entry-property :tags new-tags)
+      (pocket-reader--set-tags-column)
+      ;; Fix face
+      (pocket-reader--apply-faces-to-line))))
+
+(defun pocket-reader-set-tags ()
+  "Set TAGS of current item."
+  (interactive)
+  (with-pocket-reader
+   (let* ((item (pocket-reader--current-item))
+          (tags (--> (read-from-minibuffer "Tags: ")
+                     (s-split " " it 'omit-nulls)))
+          (tags-string (s-join "," tags)))
+     (when (pocket-lib--tags-action 'tags_replace tags-string item)
+       ;; Tags replaced successfully
+       (pocket-reader--set-entry-property :tags tags)
+       (pocket-reader--set-tags-column)
+       ;; Fix face
+       (pocket-reader--apply-faces-to-line)))))
 
 (defun pocket-reader-show-url ()
   "Open URL of current item with default function."
@@ -206,15 +262,11 @@ settings for tabulated-list-mode based on it.")
                  ('readd 'pocket-reader-unread)))
          (status (cl-case action
                    ('archive "1")
-                   ('readd "0")))
-         (title (elt (tabulated-list-get-entry) 2)))
+                   ('readd "0"))))
     (when (pocket-reader--action action)
       ;; Item successfully toggled
       (with-pocket-reader
-       (put-text-property 0 (length title)
-                          :status status
-                          title)
-       (tabulated-list-set-col 2 title)
+       (pocket-reader--set-entry-property :status status)
        ;; Set face last so it doesn't conflict with previous lines
        (put-text-property (line-beginning-position) (line-end-position)
                           'face face)))))
@@ -233,40 +285,64 @@ settings for tabulated-list-mode based on it.")
 
 ;;;;; Helpers
 
+(defun pocket-reader--set-entry-property (property value)
+  "Set current item's PROPERTY to VALUE."
+  ;; Properties are stored in the title column
+  (with-pocket-reader
+   (let ((title (elt (tabulated-list-get-entry) 2)))
+     (put-text-property 0 (length title)
+                        property value
+                        title)
+     (tabulated-list-set-col 2 title))))
+
+(defun pocket-reader--set-tags-column ()
+  "Set tags column for current entry."
+  (tabulated-list-set-col 4 (s-join "," (pocket-reader-get-property :tags))))
+
 (defun pocket-reader-apply-faces ()
   ;; TODO: Maybe we should use a custom print function but this is simpler
   (with-pocket-reader
    (goto-char (point-min))
    (while (not (eobp))
-     (when (equal "0" (pocket-reader-get-property :status))
-       (add-text-properties (line-beginning-position) (line-end-position)
-                            '(face pocket-reader-unread)))
+     (pocket-reader--apply-faces-to-line)
      (forward-line 1))
    (goto-char (point-min))))
 
-(defun pocket-reader--action (action)
+(defun pocket-reader--apply-faces-to-line ()
+  "Apply faces to current line."
+  (with-pocket-reader
+   (when (equal "0" (pocket-reader-get-property :status))
+     (add-text-properties (line-beginning-position) (line-end-position)
+                          '(face pocket-reader-unread)))))
+
+(defun pocket-reader--action (action &optional arg)
   "Execute ACTION on current item.
 ACTION should be a string or symbol which is the name of an
 action in the Pocket API."
   (with-pocket-reader
-   (let* ((id (string-to-number (tabulated-list-get-id)))
-          (item (list (cons 'item_id id))))
-     (pocket-lib--action action item))))
+   (pocket-lib--action action (pocket-reader--current-item))))
+
+(defun pocket-reader--current-item ()
+  "Return list containing cons of current item's ID, suitable for passing to pocket-lib."
+  (let* ((id (string-to-number (tabulated-list-get-id)))
+         (item (list (cons 'item_id id))))
+    item))
 
 (defun pocket-reader--set-tabulated-settings ()
   (let* ((site-width (cl-loop for item in pocket-reader-items
                               maximizing (length (elt (cadr item) 3))))
-         (title-width (- (window-text-width) 11 2 site-width 1)))
+         (title-width (- (window-text-width) 11 2 site-width 10 1)))
     (setq tabulated-list-format (vector (list "Added" 10 nil)
                                         (list "*" 1 nil) ; FIXME: Sort by star
                                         (list "Title" title-width t)
-                                        (list "Site" site-width t)))))
+                                        (list "Site" site-width t)
+                                        (list "Tags" 10 t)))))
 
 (defun pocket-reader-get-property (property)
   "Return value of PROPERTY for current item."
   (get-text-property 0 property (elt (tabulated-list-get-entry) 2)))
 
-(cl-defun pocket-reader-list-entries (&optional &key search (state "unread") favorite)
+(cl-defun pocket-reader-list-entries (&key search (state "unread") favorite)
   ;; This buffer-local variable specifies the entries displayed in the
   ;; Tabulated List buffer.  Its value should be either a list, or a
   ;; function.
@@ -289,6 +365,7 @@ action in the Pocket API."
 
   ;; FIXME: Add error handling.
   (let* ((items (cdr (cl-third (pocket-lib-get
+                                 :detail-type "complete"
                                  :count pocket-reader-show-count
                                  :search search
                                  :state state
@@ -300,14 +377,25 @@ action in the Pocket API."
                                       append (list key val))
                              items)))
     (cl-loop for it in item-plists
-             for title = (apply #'propertize (plist-get it :resolved_title)
-                                (cl-loop for key in pocket-reader-keys
-                                         append (list key (plist-get it key))))
+             for title = (pocket-reader--not-empty-string (apply #'propertize (plist-get it :resolved_title)
+                                                                 (cl-loop for key in pocket-reader-keys
+                                                                          append (list key (plist-get it key)))))
+             for tags = (pocket-reader--not-empty-string (s-join "," (pocket-lib--process-tags (plist-get it :tags))))
              collect (list (plist-get it :item_id)
                            (vector (pocket-reader--format-timestamp (string-to-number (plist-get it :time_added)))
                                    (pocket-reader--favorited-to-display (plist-get it :favorite))
                                    title
-                                   (pocket-reader--url-domain (plist-get it :resolved_url)))))))
+                                   (pocket-reader--url-domain (plist-get it :resolved_url))
+                                   tags)))))
+
+(defun pocket-reader--not-empty-string (s)
+  "If S is non-empty, return it; otherwise return \" \"."
+  ;; No column may be actually empty, because `tabulated-list-set-col' doesn't work on
+  ;; nil columns, because it uses `next-single-property-change' to find the place to
+  ;; modify.  So we use an empty string instead of nil.
+  (if (string-empty-p s)
+      " "
+    s))
 
 (defun pocket-reader--url-domain (url)
   "Return domain for URL.
