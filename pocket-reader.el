@@ -49,13 +49,25 @@
 
 ;;;; Variables
 
-
+(defvar pocket-reader-mode-map
+  (let ((map (make-keymap))
+        (mappings '(
+                    "RET" pocket-reader-open-url
+                    )))
+    (cl-loop for (key fn) on mappings by #'cddr
+             do (define-key map (kbd key) fn))
+    map))
 
 ;;;;; Customization
 
 (defgroup pocket-reader nil
   "Library for accessing GetPocket.com API."
   :group 'external)
+
+(defcustom pocket-reader-open-url-default-function
+  #'org-web-tools-read-url-as-org
+  "Default function to open items."
+  :type 'function)
 
 ;;;; Mode
 
@@ -87,6 +99,13 @@
     :resolved_url))
 
 ;;;; Functions
+
+(defun pocket-reader-open-url ()
+  "Open URL of current item with default function."
+  (interactive)
+  (let* ((pos (next-single-property-change (line-beginning-position) :resolved_url nil (line-end-position)))
+         (url (get-text-property pos :resolved_url)))
+    (funcall pocket-reader-open-url-default-function url)))
 
 (defun pocket-reader ()
   (interactive)
