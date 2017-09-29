@@ -164,11 +164,11 @@ settings for tabulated-list-mode based on it.")
 
 ;;;;; Commands
 
-(defun pocket-reader-add-tags ()
+(defun pocket-reader-add-tags (new-tags)
   "Add tags to current item."
-  (interactive)
+  (interactive (list (read-from-minibuffer "Tags: ")))
   (let ((item (pocket-reader--current-item))
-        (new-tags (--> (read-from-minibuffer "Tags: ")
+        (new-tags (--> new-tags
                        (s-split " " it 'omit-nulls)
                        (s-join "," it)))
         (old-tags (pocket-reader-get-property :tags)))
@@ -181,13 +181,12 @@ settings for tabulated-list-mode based on it.")
       ;; Fix face
       (pocket-reader--apply-faces-to-line))))
 
-(defun pocket-reader-remove-tags ()
+(defun pocket-reader-remove-tags (remove-tags)
   "Remove tags from current item."
-  (interactive)
+  (interactive (list (completing-read "Tags: " (pocket-reader-get-property :tags))))
   (let* ((item (pocket-reader--current-item))
          (old-tags (pocket-reader-get-property :tags))
-         (remove-tags (--> (completing-read "Tags: " old-tags)
-                           (s-split " " it 'omit-nulls)))
+         (remove-tags (s-split " " remove-tags 'omit-nulls))
          (remove-tags-string (s-join "," remove-tags))
          (new-tags (or (seq-difference old-tags remove-tags)
                        '(" "))))
@@ -199,13 +198,12 @@ settings for tabulated-list-mode based on it.")
       ;; Fix face
       (pocket-reader--apply-faces-to-line))))
 
-(defun pocket-reader-set-tags ()
+(defun pocket-reader-set-tags (tags)
   "Set TAGS of current item."
-  (interactive)
+  (interactive (list (read-from-minibuffer "Tags: ")))
   (with-pocket-reader
    (let* ((item (pocket-reader--current-item))
-          (tags (--> (read-from-minibuffer "Tags: ")
-                     (s-split " " it 'omit-nulls)))
+          (tags (s-split " " tags 'omit-nulls))
           (tags-string (s-join "," tags)))
      (when (pocket-lib--tags-action 'tags_replace tags-string item)
        ;; Tags replaced successfully
