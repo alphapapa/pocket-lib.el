@@ -58,6 +58,11 @@
              do (define-key map (kbd key) fn))
     map))
 
+(defvar pocket-reader-items nil
+  "Items to be shown.
+This is stored in a var so we can fetch the items and calculate
+settings for tabulated-list-mode based on it.")
+
 ;;;;; Customization
 
 (defgroup pocket-reader nil
@@ -73,6 +78,10 @@
   "Mark items as read when opened."
   :type 'boolean)
 
+(defcustom pocket-reader-show-count 50
+  "Show this many items in the list."
+  :type 'integer)
+
 ;;;;;; Faces
 
 (defface pocket-reader-unread `((default :weight bold)) "Face for unread items")
@@ -84,11 +93,10 @@
   "Pocket Reader"
   :group 'pocket-reader
 
-  (setq tabulated-list-format (vector (list "Added" 10 nil)
-                                      (list "*" 1 nil) ; FIXME: Sort by star
-                                      (list "Title" 55 t)
-                                      (list "Site" 15 t)))
-  (setq tabulated-list-entries #'pocket-reader-list-entries)
+  (setq pocket-reader-items (pocket-reader-list-entries))
+
+  (pocket-reader--set-tabulated-settings)
+  (setq tabulated-list-entries pocket-reader-items)
   (setq tabulated-list-sort-key '("Added" . nil))
 
   (tabulated-list-init-header))
@@ -116,6 +124,15 @@
        ,@body)))
 
 ;;;; Functions
+
+(defun pocket-reader--set-tabulated-settings ()
+  (let* ((site-width (cl-loop for item in pocket-reader-items
+                              maximizing (length (elt (cadr item) 3))))
+         (title-width (- (window-text-width) 11 2 site-width 1)))
+    (setq tabulated-list-format (vector (list "Added" 10 nil)
+                                        (list "*" 1 nil) ; FIXME: Sort by star
+                                        (list "Title" title-width t)
+                                        (list "Site" site-width t)))))
 
 (defun pocket-reader-get-property (property)
   "Return value of PROPERTY for current item."
@@ -154,7 +171,8 @@
    (while (not (eobp))
      (add-text-properties (line-beginning-position) (line-end-position)
                           '(face pocket-reader-unread))
-     (forward-line 1))))
+     (forward-line 1))
+   (goto-char (point-min))))
 
 (defun pocket-reader-list-entries ()
   ;; This buffer-local variable specifies the entries displayed in the
@@ -178,7 +196,7 @@
   ;;   There should be no newlines in any of these strings.
 
   ;; FIXME: Add error handling.
-  (let* ((items (cdr (cl-third (pocket-lib-get))))
+  (let* ((items (cdr (cl-third (pocket-lib-get :count pocket-reader-show-count))))
          (item-plists (--map (cl-loop with item = (kvalist->plist (cdr it))
                                       for key in pocket-reader-keys
                                       for val = (plist-get item key)
