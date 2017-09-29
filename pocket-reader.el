@@ -6,7 +6,7 @@
 ;; Created: 2017-09-25
 ;; Version: 0.1-pre
 ;; Keywords: pocket
-;; Package-Requires: ((emacs "25.1") (dash "2.13.0") (kv "0.0.19") (pocket-lib "0.1"))
+;; Package-Requires: ((emacs "25.1") (dash "2.13.0") (kv "0.0.19") (pocket-lib "0.1") (s "1.10"))
 ;; URL: https://github.com/alphapapa/pocket-reader.el
 
 ;; This file is NOT part of GNU Emacs.
@@ -44,6 +44,7 @@
 
 (require 'dash)
 (require 'kv)
+(require 's)
 
 ;; (require 'pocket-lib)
 
@@ -206,8 +207,13 @@ settings for tabulated-list-mode based on it.")
 (defun pocket-reader-search ()
   "Search Pocket items."
   (interactive)
-  (when-let ((query (read-from-minibuffer "Query: ")))
-    (setq tabulated-list-entries (pocket-reader-list-entries :search query))
+  (let* ((query-words (s-split " " (read-from-minibuffer "Query: ")))
+         (state (car (last (cl-loop for keyword in '(":archive" ":all" ":unread")
+                                    when (member keyword query-words)
+                                    do (delete keyword query-words)
+                                    and collect (s-replace (rx ":") "" keyword)))))
+         (query (s-join " " query-words)))
+    (setq tabulated-list-entries (pocket-reader-list-entries :search query :state state))
     (tabulated-list-revert)
     (pocket-reader-apply-faces)))
 
@@ -247,7 +253,7 @@ action in the Pocket API."
   (let ((pos (next-single-property-change (line-beginning-position) property nil (line-end-position))))
     (get-text-property pos property)))
 
-(defun pocket-reader-list-entries (&optional &key search)
+(cl-defun pocket-reader-list-entries (&optional &key search (state "unread"))
   ;; This buffer-local variable specifies the entries displayed in the
   ;; Tabulated List buffer.  Its value should be either a list, or a
   ;; function.
@@ -271,7 +277,8 @@ action in the Pocket API."
   ;; FIXME: Add error handling.
   (let* ((items (cdr (cl-third (pocket-lib-get
                                  :count pocket-reader-show-count
-                                 :search search))))
+                                 :search search
+                                 :state state))))
          (item-plists (--map (cl-loop with item = (kvalist->plist (cdr it))
                                       for key in pocket-reader-keys
                                       for val = (plist-get item key)
