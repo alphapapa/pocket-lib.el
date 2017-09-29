@@ -224,8 +224,8 @@ it into a vector automatically. See
   (declare (indent defun))
   (request-response-data
    (pocket-lib--request 'send
-                        :data (list :actions (vconcat actions))
-                        :sync t)))
+     :data (list :actions (vconcat actions))
+     :sync t)))
 
 ;;;;; Actions
 
@@ -236,9 +236,9 @@ Action may be a symbol or a string."
                   (string action)
                   (symbol (symbol-name action)))))
     (pocket-lib--send
-     (--map (list :action action
-                  :item_id (alist-get 'item_id it))
-            items))))
+      (--map (list :action action
+                   :item_id (alist-get 'item_id it))
+             items))))
 
 (cl-defun pocket-lib-add-urls (&rest urls &key tags &allow-other-keys)
   "Add URLs to Pocket.
