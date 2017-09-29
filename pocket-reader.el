@@ -196,11 +196,11 @@ settings for tabulated-list-mode based on it.")
 (defun pocket-reader-toggle-archived ()
   "Toggle current item's archived/unread status."
   (interactive)
-  (let* ((action (if (equal "0" (pocket-reader-get-property :status))
-                     ;; Unread; archive
-                     'archive
+  (let* ((action (pcase (pocket-reader-get-property :status)
+                   ;; Unread; archive
+                   ("0" 'archive)
                    ;; Archived; readd
-                   'readd))
+                   ("1" 'readd)))
          (face (cl-case action
                  ('archive 'pocket-reader-archived)
                  ('readd 'pocket-reader-unread)))
