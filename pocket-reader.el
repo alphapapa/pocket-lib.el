@@ -69,6 +69,15 @@
   "Default function to open items."
   :type 'function)
 
+(defcustom pocket-reader-archive-on-open t
+  "Mark items as read when opened."
+  :type 'boolean)
+
+;;;;;; Faces
+
+(defface pocket-reader-unread `((default :weight bold)) "Face for unread items")
+(defface pocket-reader-archived `((default :weight normal)) "Face for archived items")
+
 ;;;; Mode
 
 (define-derived-mode pocket-reader-mode tabulated-list-mode
@@ -98,20 +107,54 @@
     :amp_url
     :resolved_url))
 
+;;;; Macros
+
+(defmacro with-pocket-reader (&rest body)
+  "Run BODY in pocket-reader buffer."
+  `(with-current-buffer "*pocket-reader*"
+     (let ((inhibit-read-only t))
+       ,@body)))
+
 ;;;; Functions
+
+(defun pocket-reader-get-property (property)
+  "Return value of PROPERTY for current item."
+  (let ((pos (next-single-property-change (line-beginning-position) property nil (line-end-position))))
+    (get-text-property pos property)))
 
 (defun pocket-reader-open-url ()
   "Open URL of current item with default function."
   (interactive)
-  (let* ((pos (next-single-property-change (line-beginning-position) :resolved_url nil (line-end-position)))
-         (url (get-text-property pos :resolved_url)))
-    (funcall pocket-reader-open-url-default-function url)))
+  (let ((url (pocket-reader-get-property :resolved_url)))
+    (when (funcall pocket-reader-open-url-default-function url)
+      ;; Item opened successfully
+      (when pocket-reader-archive-on-open
+        (pocket-reader-archive)))))
+
+(defun pocket-reader-archive ()
+  "Mark current item as read."
+  (with-pocket-reader
+   (let* ((id (string-to-number (pocket-reader-get-property 'tabulated-list-id)))
+          (item (list (cons 'item_id id))))
+     (when (pocket-lib-archive item)
+       ;; Item successfully archived
+       (set-text-properties (line-beginning-position) (line-end-position)
+                            '(face pocket-reader-archived))))))
 
 (defun pocket-reader ()
   (interactive)
   (switch-to-buffer (get-buffer-create "*pocket-reader*"))
   (pocket-reader-mode)
-  (tabulated-list-print 'remember-pos 'update))
+  (tabulated-list-print 'remember-pos 'update)
+
+  ;; Apply face
+  ;; TODO: Should probably do this with a custom print function
+  (with-pocket-reader
+   (goto-char (point-min))
+   (while (not (eobp))
+     (add-text-properties (line-beginning-position) (line-end-position)
+                          '(face pocket-reader-unread))
+     (forward-line 1))))
 
 (defun pocket-reader-list-entries ()
   ;; This buffer-local variable specifies the entries displayed in the
