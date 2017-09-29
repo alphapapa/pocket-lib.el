@@ -53,6 +53,8 @@
   (let ((map (make-keymap))
         (mappings '(
                     "RET" pocket-reader-open-url
+                    "a" pocket-reader-archive
+                    "u" pocket-reader-readd
                     )))
     (cl-loop for (key fn) on mappings by #'cddr
              do (define-key map (kbd key) fn))
@@ -150,6 +152,7 @@ settings for tabulated-list-mode based on it.")
 
 (defun pocket-reader-archive ()
   "Mark current item as read."
+  (interactive)
   (with-pocket-reader
    (let* ((id (string-to-number (pocket-reader-get-property 'tabulated-list-id)))
           (item (list (cons 'item_id id))))
@@ -157,6 +160,17 @@ settings for tabulated-list-mode based on it.")
        ;; Item successfully archived
        (set-text-properties (line-beginning-position) (line-end-position)
                             '(face pocket-reader-archived))))))
+
+(defun pocket-reader-readd ()
+  "Mark current item as unread."
+  (interactive)
+  (with-pocket-reader
+   (let* ((id (string-to-number (pocket-reader-get-property 'tabulated-list-id)))
+          (item (list (cons 'item_id id))))
+     (when (pocket-lib-readd item)
+       ;; Item successfully archived
+       (set-text-properties (line-beginning-position) (line-end-position)
+                            '(face pocket-reader-unread))))))
 
 (defun pocket-reader ()
   (interactive)
