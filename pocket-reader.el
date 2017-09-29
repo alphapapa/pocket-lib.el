@@ -45,14 +45,15 @@
 (require 'dash)
 (require 'kv)
 
-(require 'pocket-lib)
+;; (require 'pocket-lib)
 
 ;;;; Variables
 
 (defvar pocket-reader-mode-map
   (let ((map (make-keymap))
         (mappings '(
-                    "RET" pocket-reader-open-url
+                    "RET" pocket-reader-show-url
+                    "TAB" pocket-reader-pop-to-url
                     "a" pocket-reader-archive
                     "u" pocket-reader-readd
                     )))
@@ -71,9 +72,15 @@ settings for tabulated-list-mode based on it.")
   "Library for accessing GetPocket.com API."
   :group 'external)
 
-(defcustom pocket-reader-open-url-default-function
+(defcustom pocket-reader-show-url-default-function
   #'org-web-tools-read-url-as-org
   "Default function to open items."
+  :type 'function)
+
+(defcustom pocket-reader-pop-to-url-default-function
+  (lambda (url)
+    (funcall #'org-web-tools-read-url-as-org url :show-buffer-fn #'pop-to-buffer))
+  "Default function to pop-to items."
   :type 'function)
 
 (defcustom pocket-reader-archive-on-open t
@@ -88,6 +95,14 @@ settings for tabulated-list-mode based on it.")
 
 (defface pocket-reader-unread `((default :weight bold)) "Face for unread items")
 (defface pocket-reader-archived `((default :weight normal)) "Face for archived items")
+
+;;;; Macros
+
+(defmacro with-pocket-reader (&rest body)
+  "Run BODY in pocket-reader buffer."
+  `(with-current-buffer "*pocket-reader*"
+     (let ((inhibit-read-only t))
+       ,@body)))
 
 ;;;; Mode
 
@@ -117,35 +132,40 @@ settings for tabulated-list-mode based on it.")
     :amp_url
     :resolved_url))
 
-;;;; Macros
+(defun pocket-reader ()
+  (interactive)
+  (switch-to-buffer (get-buffer-create "*pocket-reader*"))
+  (pocket-reader-mode)
+  (tabulated-list-print 'remember-pos 'update)
 
-(defmacro with-pocket-reader (&rest body)
-  "Run BODY in pocket-reader buffer."
-  `(with-current-buffer "*pocket-reader*"
-     (let ((inhibit-read-only t))
-       ,@body)))
+  ;; Apply face
+  ;; TODO: Should probably do this with a custom print function
+  (with-pocket-reader
+   (goto-char (point-min))
+   (while (not (eobp))
+     (add-text-properties (line-beginning-position) (line-end-position)
+                          '(face pocket-reader-unread))
+     (forward-line 1))
+   (goto-char (point-min))))
 
 ;;;; Functions
 
-(defun pocket-reader--set-tabulated-settings ()
-  (let* ((site-width (cl-loop for item in pocket-reader-items
-                              maximizing (length (elt (cadr item) 3))))
-         (title-width (- (window-text-width) 11 2 site-width 1)))
-    (setq tabulated-list-format (vector (list "Added" 10 nil)
-                                        (list "*" 1 nil) ; FIXME: Sort by star
-                                        (list "Title" title-width t)
-                                        (list "Site" site-width t)))))
+;;;;; Commands
 
-(defun pocket-reader-get-property (property)
-  "Return value of PROPERTY for current item."
-  (let ((pos (next-single-property-change (line-beginning-position) property nil (line-end-position))))
-    (get-text-property pos property)))
-
-(defun pocket-reader-open-url ()
+(defun pocket-reader-show-url ()
   "Open URL of current item with default function."
   (interactive)
   (let ((url (pocket-reader-get-property :resolved_url)))
-    (when (funcall pocket-reader-open-url-default-function url)
+    (when (funcall pocket-reader-show-url-default-function url)
+      ;; Item opened successfully
+      (when pocket-reader-archive-on-open
+        (pocket-reader-archive)))))
+
+(defun pocket-reader-pop-to-url ()
+  "Open URL of current item with default pop-to function."
+  (interactive)
+  (let ((url (pocket-reader-get-property :resolved_url)))
+    (when (funcall pocket-reader-pop-to-url-default-function url)
       ;; Item opened successfully
       (when pocket-reader-archive-on-open
         (pocket-reader-archive)))))
@@ -172,21 +192,21 @@ settings for tabulated-list-mode based on it.")
        (set-text-properties (line-beginning-position) (line-end-position)
                             '(face pocket-reader-unread))))))
 
-(defun pocket-reader ()
-  (interactive)
-  (switch-to-buffer (get-buffer-create "*pocket-reader*"))
-  (pocket-reader-mode)
-  (tabulated-list-print 'remember-pos 'update)
+;;;;; Helpers
 
-  ;; Apply face
-  ;; TODO: Should probably do this with a custom print function
-  (with-pocket-reader
-   (goto-char (point-min))
-   (while (not (eobp))
-     (add-text-properties (line-beginning-position) (line-end-position)
-                          '(face pocket-reader-unread))
-     (forward-line 1))
-   (goto-char (point-min))))
+(defun pocket-reader--set-tabulated-settings ()
+  (let* ((site-width (cl-loop for item in pocket-reader-items
+                              maximizing (length (elt (cadr item) 3))))
+         (title-width (- (window-text-width) 11 2 site-width 1)))
+    (setq tabulated-list-format (vector (list "Added" 10 nil)
+                                        (list "*" 1 nil) ; FIXME: Sort by star
+                                        (list "Title" title-width t)
+                                        (list "Site" site-width t)))))
+
+(defun pocket-reader-get-property (property)
+  "Return value of PROPERTY for current item."
+  (let ((pos (next-single-property-change (line-beginning-position) property nil (line-end-position))))
+    (get-text-property pos property)))
 
 (defun pocket-reader-list-entries ()
   ;; This buffer-local variable specifies the entries displayed in the
