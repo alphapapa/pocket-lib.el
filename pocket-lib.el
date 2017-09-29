@@ -252,6 +252,23 @@ Action may be a symbol or a string."
   ;; the minibuffer if the API command gives an error.
   (apply #'pocket-lib--action 'readd items))
 
+(defun pocket-lib--tags-action (action tags &rest items)
+  "Execute tag ACTION on ITEMS with TAGS."
+  (let ((action (cl-typecase action
+                  (string action)
+                  (symbol (symbol-name action)))))
+    (cond ((null tags)
+           (pocket-lib--send
+             (--map (list :action action
+                          :item_id (alist-get 'item_id it))
+                    items)))
+          (tags
+           (pocket-lib--send
+             (--map (list :action action
+                          :item_id (alist-get 'item_id it)
+                          :tags tags)
+                    items))))))
+
 ;;;;; Helpers
 
 (defun pocket-lib--plist-non-nil (plist)
@@ -259,6 +276,11 @@ Action may be a symbol or a string."
   (cl-loop for (key value) on plist by #'cddr
            unless (null value)
            append (list key value)))
+
+(defun pocket-lib--process-tags (tags)
+  "Return simple list of strings for TAGS structure as returned by Pocket API."
+  (cl-loop for tag in tags
+           collect (alist-get 'tag tag)))
 
 ;;;; Footer
 
