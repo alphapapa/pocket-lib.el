@@ -142,6 +142,7 @@ settings for tabulated-list-mode based on it.")
     :time_added
     :time_updated
     :time_read
+    :given_title
     :resolved_title
     :excerpt
     :has_video
@@ -383,7 +384,9 @@ action in the Pocket API."
                                       append (list key val))
                              items)))
     (cl-loop for it in item-plists
-             for title = (pocket-reader--not-empty-string (apply #'propertize (plist-get it :resolved_title)
+             for title = (pocket-reader--not-empty-string (apply #'propertize (or (plist-get it :resolved_title)
+                                                                                  (plist-get it :given_title)
+                                                                                  "[untitled]")
                                                                  (cl-loop for key in pocket-reader-keys
                                                                           when (consp key)
                                                                           do (setq key (car key))
