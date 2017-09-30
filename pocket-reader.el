@@ -54,9 +54,11 @@
 (defvar pocket-reader-mode-map
   (let ((map (make-sparse-keymap))
         (mappings '(
-                    "RET" pocket-reader-show-url
+                    "RET" pocket-reader-open-url
                     "TAB" pocket-reader-pop-to-url
                     "a" pocket-reader-toggle-archived
+                    "b" pocket-reader-open-in-external-browser
+                    "c" pocket-reader-copy-url
                     "u" pocket-reader-toggle-archived
                     "*" pocket-reader-toggle-favorite
                     "f" pocket-reader-toggle-favorite
@@ -99,6 +101,17 @@ settings for tabulated-list-mode based on it.")
 (defcustom pocket-reader-show-count 50
   "Show this many items in the list."
   :type 'integer)
+
+(defcustom pocket-reader-url-open-fn-map nil
+  "A list mapping URL-matching regular expressions to functions used to open the URL.
+Regexps are anchored after the protocol (i.e. \"https://\" is not
+matched against).
+
+This is useful when certain sites should be opened in an external
+browser.  The list is backward in the sense that the functions
+are listed first, followed by the regexps, in this format: (FN
+REGEXP REGEXP ...)."
+  :type 'list)
 
 ;;;;;; Faces
 
@@ -164,6 +177,18 @@ settings for tabulated-list-mode based on it.")
 
 ;;;;; Commands
 
+(defun pocket-reader-open-in-external-browser ()
+  (interactive)
+  (let ((pocket-reader-open-url-default-function #'browse-url-default-browser))
+    (call-interactively #'pocket-reader-open-url)))
+
+(defun pocket-reader-copy-url ()
+  "Copy URL of current item to kill-ring/clipboard."
+  (interactive)
+  (when-let ((url (pocket-reader-get-property :resolved_url)))
+    (kill-new url)
+    (message url)))
+
 (defun pocket-reader-add-tags (new-tags)
   "Add tags to current item."
   (interactive (list (read-from-minibuffer "Tags: ")))
@@ -212,25 +237,31 @@ settings for tabulated-list-mode based on it.")
        ;; Fix face
        (pocket-reader--apply-faces-to-line)))))
 
-(defun pocket-reader-show-url ()
+(defun pocket-reader-open-url (&optional &key fn)
   "Open URL of current item with default function."
   (interactive)
-  (let ((url (pocket-reader-get-property :resolved_url)))
-    (when (funcall pocket-reader-show-url-default-function url)
+  (let* ((url (pocket-reader-get-property :resolved_url))
+         (fn (or fn (pocket-reader--map-url-open-fn url))))
+    (when (funcall fn url)
       ;; Item opened successfully
       (when pocket-reader-archive-on-open
         (with-pocket-reader
          (pocket-reader-toggle-archived))))))
 
+(defun pocket-reader--map-url-open-fn (url)
+  "Return function to use to open URL."
+  (or (car (cl-rassoc url pocket-reader-url-open-fn-map
+                      :test (lambda (url regexp)
+                              (string-match (rx-to-string `(seq "http" (optional "s") "://"
+                                                                (regexp ,(car regexp))
+                                                                (or "/" eos)))
+                                            url))))
+      pocket-reader-open-url-default-function))
+
 (defun pocket-reader-pop-to-url ()
   "Open URL of current item with default pop-to function."
   (interactive)
-  (let ((url (pocket-reader-get-property :resolved_url)))
-    (when (funcall pocket-reader-pop-to-url-default-function url)
-      ;; Item opened successfully
-      (when pocket-reader-archive-on-open
-        (with-pocket-reader
-         (pocket-reader-toggle-archived))))))
+  (pocket-reader-open-url :fn #'pocket-reader-pop-to-url-default-function))
 
 (defun pocket-reader-toggle-favorite ()
   "Toggle current item's favorite status."
