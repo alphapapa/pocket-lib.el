@@ -140,7 +140,8 @@ not be used outside of functions that already use it.")
   "Show this many items in the list."
   :type 'integer)
 
-(defcustom pocket-reader-url-open-fn-map nil
+(defcustom pocket-reader-url-open-fn-map
+  '((eww-browse-url "news.ycombinator.com"))
   "A list mapping URL-matching regular expressions to functions used to open the URL.
 Regexps are anchored after the protocol (i.e. \"https://\" is not
 matched against).
@@ -149,7 +150,8 @@ This is useful when certain sites should be opened in an external
 browser.  The list is backward in the sense that the functions
 are listed first, followed by the regexps, in this format: (FN
 REGEXP REGEXP ...)."
-  :type 'list)
+  :type '(alist :key-type function
+                :value-type (repeat string)))
 
 (defcustom pocket-reader-finalize-hook
   '(pocket-reader--apply-faces
@@ -158,10 +160,6 @@ REGEXP REGEXP ...)."
   :type 'hook
   :options '(pocket-reader--apply-faces
              pocket-reader--add-overlays))
-
-(setq pocket-reader-url-open-fn-map
-      (list (list #'browse-url-chrome
-                  "news.ycombinator.com")))
 
 ;;;;;; Faces
 
