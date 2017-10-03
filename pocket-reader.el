@@ -202,16 +202,14 @@ REGEXP REGEXP ...)."
 
 (defun pocket-reader-search (&optional query)
   "Search Pocket items with QUERY."
+  ;; This function is the main one used to get and display items.
+  ;; When QUERY is nil, it simply shows the default list of unread items.
   (interactive (list (read-from-minibuffer "Query: ")))
   (custom-reevaluate-setting 'pocket-reader-show-count)
-  (setq pocket-reader-offset 0)
-  (setq pocket-reader-query query)
-  (setq pocket-reader-items (pocket-reader--get-items query))
-  (pocket-reader--set-tabulated-settings)
-  (setq tabulated-list-entries pocket-reader-items)
-  (tabulated-list-init-header)
-  (tabulated-list-revert)
-  (run-hooks 'pocket-reader-finalize-hook))
+  (setq pocket-reader-offset 0
+        pocket-reader-query query
+        pocket-reader-items nil)
+  (pocket-reader--add-items (pocket-reader--get-items query)))
 
 (defun pocket-reader-more (count)
   "Fetch and show COUNT more items."
@@ -219,11 +217,8 @@ REGEXP REGEXP ...)."
   (let* ((count (if (= 1 count)
                     pocket-reader-show-count
                   count))
-         (offset (incf pocket-reader-offset count))
-         (new-items (pocket-reader--get-items pocket-reader-query)))
-    (setq tabulated-list-entries (append tabulated-list-entries new-items))
-    (tabulated-list-revert)
-    (run-hooks 'pocket-reader-finalize-hook)))
+         (offset (incf pocket-reader-offset count)))
+    (pocket-reader--add-items (pocket-reader--get-items pocket-reader-query))))
 
 ;;;;;; Tags
 
@@ -288,6 +283,11 @@ REGEXP REGEXP ...)."
         (with-pocket-reader
          (pocket-reader-toggle-archived))))))
 
+(defun pocket-reader-pop-to-url ()
+  "Open URL of current item with default pop-to function."
+  (interactive)
+  (pocket-reader-open-url :fn #'pocket-reader-pop-to-url-default-function))
+
 (defun pocket-reader-open-in-external-browser ()
   (interactive)
   (let ((pocket-reader-open-url-default-function #'browse-url-default-browser))
@@ -300,10 +300,7 @@ REGEXP REGEXP ...)."
     (kill-new url)
     (message url)))
 
-(defun pocket-reader-pop-to-url ()
-  "Open URL of current item with default pop-to function."
-  (interactive)
-  (pocket-reader-open-url :fn #'pocket-reader-pop-to-url-default-function))
+;;;;;; Other
 
 (defun pocket-reader-toggle-favorite ()
   "Toggle current item's favorite status."
@@ -344,95 +341,16 @@ REGEXP REGEXP ...)."
        (put-text-property (line-beginning-position) (line-end-position)
                           'face face)))))
 
-
-
 ;;;;; Helpers
 
-(defun pocket-reader--map-url-open-fn (url)
-  "Return function to use to open URL."
-  (or (car (cl-rassoc url pocket-reader-url-open-fn-map
-                      :test (lambda (url regexp)
-                              (string-match (rx-to-string `(seq "http" (optional "s") "://"
-                                                                (regexp ,(car regexp))
-                                                                (or "/" eos)))
-                                            url))))
-      pocket-reader-open-url-default-function))
-
-(defun pocket-reader--set-entry-property (property value)
-  "Set current item's PROPERTY to VALUE."
-  ;; Properties are stored in the title column
-  (with-pocket-reader
-   (let ((title (elt (tabulated-list-get-entry) 2)))
-     (put-text-property 0 (length title)
-                        property value
-                        title)
-     (tabulated-list-set-col 2 title))))
-
-(defun pocket-reader--set-tags-column ()
-  "Set tags column for current entry."
-  (tabulated-list-set-col 4 (s-join "," (pocket-reader--get-property :tags))))
-
-(defun pocket-reader--apply-faces ()
-  ;; TODO: Maybe we should use a custom print function but this is simpler
-  (with-pocket-reader
-   (goto-char (point-min))
-   (while (not (eobp))
-     (pocket-reader--apply-faces-to-line)
-     (forward-line 1))
-   (goto-char (point-min))))
-
-(defun pocket-reader--apply-faces-to-line ()
-  "Apply faces to current line."
-  (with-pocket-reader
-   (when (equal "0" (pocket-reader--get-property :status))
-     (add-text-properties (line-beginning-position) (line-end-position)
-                          '(face pocket-reader-unread)))
-   (when (pocket-reader--get-property :favorite)
-     (pocket-reader--set-column-face "*" 'pocket-reader-favorite-star))))
-
-(defun pocket-reader--set-column-face (column face)
-  "Apply FACE to COLUMN on current line.
-COLUMN may be the column name or number."
-  (let* ((column-num (cl-typecase column
-                       (integer column)
-                       (string (tabulated-list--column-number column))))
-         (column-data (aref tabulated-list-format column-num))
-         (start-pos (+ (line-beginning-position)
-                       (1+ (cl-loop for i from 0 below column-num
-                                    for col-data = (aref tabulated-list-format i)
-                                    for col-width = (elt col-data 1)
-                                    sum col-width))))
-         (column-width (elt column-data 1))
-         (end-pos (+ start-pos column-width)))
-    (with-pocket-reader
-     (add-face-text-property start-pos end-pos face t))))
-
-(defun pocket-reader--action (action &optional arg)
-  "Execute ACTION on current item.
-ACTION should be a string or symbol which is the name of an
-action in the Pocket API."
-  (with-pocket-reader
-   (pocket-lib--action action (pocket-reader--current-item))))
-
-(defun pocket-reader--current-item ()
-  "Return list containing cons of current item's ID, suitable for passing to pocket-lib."
-  (let* ((id (string-to-number (tabulated-list-get-id)))
-         (item (list (cons 'item_id id))))
-    item))
-
-(defun pocket-reader--set-tabulated-settings ()
-  (let* ((site-width (cl-loop for item in pocket-reader-items
-                              maximizing (length (elt (cadr item) 3))))
-         (title-width (- (window-text-width) 11 2 site-width 10 1)))
-    (setq tabulated-list-format (vector (list "Added" 10 nil)
-                                        (list "*" 1 nil) ; FIXME: Sort by star
-                                        (list "Title" title-width t)
-                                        (list "Site" site-width t)
-                                        (list "Tags" 10 t)))))
-
-(defun pocket-reader--get-property (property)
-  "Return value of PROPERTY for current item."
-  (get-text-property 0 property (elt (tabulated-list-get-entry) 2)))
+(defun pocket-reader--add-items (items)
+  "Add and display ITEMS."
+  (setq pocket-reader-items (append pocket-reader-items items))
+  (pocket-reader--set-tabulated-settings)
+  (setq tabulated-list-entries pocket-reader-items)
+  (tabulated-list-init-header)
+  (tabulated-list-revert)
+  (run-hooks 'pocket-reader-finalize-hook))
 
 (defun pocket-reader--get-items (&optional query)
   "Return Pocket items for QUERY.
@@ -503,10 +421,61 @@ QUERY is a string which may contain certain keywords:
              for tags = (pocket-reader--not-empty-string (s-join "," (plist-get it :tags)))
              collect (list (plist-get it :item_id)
                            (vector (pocket-reader--format-timestamp (string-to-number (plist-get it :time_added)))
-                                   (pocket-reader--favorited-to-display (plist-get it :favorite))
+                                   (pocket-reader--favorite-string (plist-get it :favorite))
                                    title
                                    (pocket-reader--url-domain (plist-get it :resolved_url))
                                    tags)))))
+
+(defun pocket-reader--action (action &optional arg)
+  "Execute ACTION on current item.
+ACTION should be a string or symbol which is the name of an
+action in the Pocket API."
+  (with-pocket-reader
+   (pocket-lib--action action (pocket-reader--current-item))))
+
+(defun pocket-reader--set-tags-column ()
+  "Set tags column for current entry."
+  (tabulated-list-set-col 4 (s-join "," (pocket-reader--get-property :tags))))
+
+(defun pocket-reader--set-tabulated-settings ()
+  (let* ((site-width (cl-loop for item in pocket-reader-items
+                              maximizing (length (elt (cadr item) 3))))
+         (title-width (- (window-text-width) 11 2 site-width 10 1)))
+    (setq tabulated-list-format (vector (list "Added" 10 nil)
+                                        (list "*" 1 nil) ; FIXME: Sort by star
+                                        (list "Title" title-width t)
+                                        (list "Site" site-width t)
+                                        (list "Tags" 10 t)))))
+
+(defun pocket-reader--map-url-open-fn (url)
+  "Return function to use to open URL."
+  (or (car (cl-rassoc url pocket-reader-url-open-fn-map
+                      :test (lambda (url regexp)
+                              (string-match (rx-to-string `(seq "http" (optional "s") "://"
+                                                                (regexp ,(car regexp))
+                                                                (or "/" eos)))
+                                            url))))
+      pocket-reader-open-url-default-function))
+
+(defun pocket-reader--current-item ()
+  "Return list containing cons of current item's ID, suitable for passing to pocket-lib."
+  (let* ((id (string-to-number (tabulated-list-get-id)))
+         (item (list (cons 'item_id id))))
+    item))
+
+(defun pocket-reader--get-property (property)
+  "Return value of PROPERTY for current item."
+  (get-text-property 0 property (elt (tabulated-list-get-entry) 2)))
+
+(defun pocket-reader--set-entry-property (property value)
+  "Set current item's PROPERTY to VALUE."
+  ;; Properties are stored in the title column
+  (with-pocket-reader
+   (let ((title (elt (tabulated-list-get-entry) 2)))
+     (put-text-property 0 (length title)
+                        property value
+                        title)
+     (tabulated-list-set-col 2 title))))
 
 (defun pocket-reader--not-empty-string (s)
   "If S is non-empty, return it; otherwise return \" \"."
@@ -523,14 +492,14 @@ Common prefixes like www are removed."
   (replace-regexp-in-string (rx bos (and (or "www") ".")) ""
                             (url-host (url-generic-parse-url url))))
 
-(defun pocket-reader--favorited-to-display (val)
+(defun pocket-reader--favorite-string (val)
   "If VAL is 1, return the star character as a string, otherwise the empty string."
   (pcase val
     ("0" "")
     ("1" "*")))
 
 (defun pocket-reader--format-timestamp (timestamp)
-  ""
+  "Format TIMESTAMP."
   (format-time-string "%Y-%m-%d" timestamp))
 
 (defun pocket-reader--add-overlays ()
@@ -549,6 +518,43 @@ For example, if sorted by date, a spacer will be inserted where the date changes
                do (progn
                     (ov (line-beginning-position) (line-end-position) 'display (format ""))
                     (setq prev-data current-data))))))
+
+;;;;;; Faces
+
+(defun pocket-reader--apply-faces ()
+  ;; TODO: Maybe we should use a custom print function but this is simpler
+  (with-pocket-reader
+   (goto-char (point-min))
+   (while (not (eobp))
+     (pocket-reader--apply-faces-to-line)
+     (forward-line 1))
+   (goto-char (point-min))))
+
+(defun pocket-reader--apply-faces-to-line ()
+  "Apply faces to current line."
+  (with-pocket-reader
+   (when (equal "0" (pocket-reader--get-property :status))
+     (add-text-properties (line-beginning-position) (line-end-position)
+                          '(face pocket-reader-unread)))
+   (when (pocket-reader--get-property :favorite)
+     (pocket-reader--set-column-face "*" 'pocket-reader-favorite-star))))
+
+(defun pocket-reader--set-column-face (column face)
+  "Apply FACE to COLUMN on current line.
+COLUMN may be the column name or number."
+  (let* ((column-num (cl-typecase column
+                       (integer column)
+                       (string (tabulated-list--column-number column))))
+         (column-data (aref tabulated-list-format column-num))
+         (start-pos (+ (line-beginning-position)
+                       (1+ (cl-loop for i from 0 below column-num
+                                    for col-data = (aref tabulated-list-format i)
+                                    for col-width = (elt col-data 1)
+                                    sum col-width))))
+         (column-width (elt column-data 1))
+         (end-pos (+ start-pos column-width)))
+    (with-pocket-reader
+     (add-face-text-property start-pos end-pos face t))))
 
 ;;;; Footer
 
