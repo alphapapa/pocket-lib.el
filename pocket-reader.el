@@ -6,7 +6,7 @@
 ;; Created: 2017-09-25
 ;; Version: 0.1-pre
 ;; Keywords: pocket
-;; Package-Requires: ((emacs "25.1") (dash "2.13.0") (kv "0.0.19") (pocket-lib "0.1") (s "1.10") (ov "1.0.6"))
+;; Package-Requires: ((emacs "25.1") (dash "2.13.0") (kv "0.0.19") (pocket-lib "0.1") (s "1.10") (ov "1.0.6") (rainbow-identifiers "0.2.2"))
 ;; URL: https://github.com/alphapapa/pocket-reader.el
 
 ;; This file is NOT part of GNU Emacs.
@@ -47,6 +47,7 @@
 (require 'kv)
 (require 'ov)
 (require 's)
+(require 'rainbow-identifiers)
 
 ;; (require 'pocket-lib)
 
@@ -124,6 +125,14 @@ not be used outside of functions that already use it.")
 
 (defcustom pocket-reader-archive-on-open t
   "Mark items as read when opened."
+  :type 'boolean)
+
+(defcustom pocket-reader-color-site t
+  "Colorize site names uniquely."
+  :type 'boolean)
+
+(defcustom pocket-reader-color-title t
+  "Colorize titles according to site."
   :type 'boolean)
 
 (defcustom pocket-reader-show-count 50
@@ -364,7 +373,7 @@ REGEXP REGEXP ...)."
 (defun pocket-reader--finalize (&rest ignore)
   "Finalize the buffer after adding or sorting items."
   ;; Make sure it's the pocket-reader buffer.
-  (when (string= "*pocket-reader*" (current-buffer))
+  (when (string= "*pocket-reader*" (buffer-name))
     (run-hooks 'pocket-reader-finalize-hook)))
 
 (defun pocket-reader--get-items (&optional query)
@@ -553,7 +562,21 @@ For example, if sorted by date, a spacer will be inserted where the date changes
      (add-text-properties (line-beginning-position) (line-end-position)
                           '(face pocket-reader-unread)))
    (when (pocket-reader--get-property :favorite)
-     (pocket-reader--set-column-face "*" 'pocket-reader-favorite-star))))
+     (pocket-reader--set-column-face "*" 'pocket-reader-favorite-star))
+   (when (or pocket-reader-color-site
+             pocket-reader-color-title)
+     (pocket-reader--set-site-face))))
+
+(defun pocket-reader--set-site-face ()
+  "Apply colored face to site column for current entry."
+  (let* ((column (tabulated-list--column-number "Site"))
+         (site (elt (tabulated-list-get-entry) column))
+         (hash (rainbow-identifiers--hash-function site))
+         (face (rainbow-identifiers-cie-l*a*b*-choose-face hash)))
+    (when pocket-reader-color-site
+      (pocket-reader--set-column-face "Site" face))
+    (when pocket-reader-color-title
+      (pocket-reader--set-column-face "Title" face))))
 
 (defun pocket-reader--set-column-face (column face)
   "Apply FACE to COLUMN on current line.
