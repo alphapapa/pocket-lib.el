@@ -291,11 +291,14 @@ REGEXP REGEXP ...)."
   (interactive)
   (save-excursion
     (goto-char (point-min))
+    ;; FIXME: This won't work if the first item has no excerpt
     (let ((first-excerpt (pocket-reader--get-property :excerpt)))
       (if (cl-loop for ov in (ov-forwards)
-                   thereis (ov-val ov 'before-string))
+                   thereis (equal (ov-val ov 'before-string) first-excerpt))
           ;; Already shown; hide all
-          (ov-clear 'before-string)
+          (cl-loop for ov in (ov-forwards)
+                   when (not (equal (ov-val ov 'before-string) "\n"))
+                   do (ov-reset ov))
         ;; Show all
         (while (not (eobp))
           (pocket-reader-excerpt)
