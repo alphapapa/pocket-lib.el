@@ -456,7 +456,7 @@ REGEXP REGEXP ...)."
 QUERY is a string which may contain certain keywords:
 
 :*, :favorite  Return only favorited items.
-:archived      Return only archived items.
+:archive      Return only archived items.
 :unread        Return only unread items (default).
 :all           Return all items.
 :COUNT         Return at most COUNT (a number) items."
