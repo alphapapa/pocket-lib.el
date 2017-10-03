@@ -568,9 +568,10 @@ For example, if sorted by date, a spacer will be inserted where the date changes
 (defun pocket-reader--apply-faces-to-line ()
   "Apply faces to current line."
   (with-pocket-reader
-   (when (equal "0" (pocket-reader--get-property :status))
-     (add-text-properties (line-beginning-position) (line-end-position)
-                          '(face pocket-reader-unread)))
+   (add-text-properties (line-beginning-position) (line-end-position)
+                        (list 'face (pcase (pocket-reader--get-property :status)
+                                      ("0" 'pocket-reader-unread)
+                                      ("1" 'pocket-reader-read)) ))
    (when (pocket-reader--get-property :favorite)
      (pocket-reader--set-column-face "*" 'pocket-reader-favorite-star))
    (when (or pocket-reader-color-site
