@@ -266,7 +266,9 @@ REGEXP REGEXP ...)."
              (string (concat prefix (s-trim (propertize (pocket-reader--wrap-string excerpt width)
                                                         'face 'default)) "\n")))
         (unless (cl-loop for ov in (ov-forwards)
-                         thereis (equal string (ov-val ov 'before-string)))
+                         when (equal string (ov-val ov 'before-string))
+                         do (ov-reset ov)
+                         and return t)
           (ov (1+ (line-end-position)) (1+ (line-end-position))
               'before-string string))))))
 
