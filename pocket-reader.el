@@ -49,6 +49,7 @@
 (require 's)
 (require 'rainbow-identifiers)
 
+(require 'org-web-tools)
 (require 'pocket-lib)
 
 ;;;; Variables
