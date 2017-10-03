@@ -49,7 +49,7 @@
 (require 's)
 (require 'rainbow-identifiers)
 
-;; (require 'pocket-lib)
+(require 'pocket-lib)
 
 ;;;; Variables
 
