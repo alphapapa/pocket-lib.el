@@ -369,9 +369,7 @@ REGEXP REGEXP ...)."
       ;; Item successfully toggled
       (with-pocket-reader
        (pocket-reader--set-entry-property :status status)
-       ;; Set face last so it doesn't conflict with previous lines
-       (put-text-property (line-beginning-position) (line-end-position)
-                          'face face)))))
+       (pocket-reader--apply-faces-to-line)))))
 
 ;;;;; Helpers
 
