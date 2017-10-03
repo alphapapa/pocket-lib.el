@@ -155,7 +155,9 @@ REGEXP REGEXP ...)."
   (setq tabulated-list-entries pocket-reader-items)
   (setq tabulated-list-sort-key '("Added" . nil))
 
-  (tabulated-list-init-header))
+  (tabulated-list-init-header)
+  (tabulated-list-print 'remember-pos 'update)
+  (run-hooks 'pocket-reader-finalize-hook))
 
 (defconst pocket-reader-keys
   '(:item_id
@@ -177,9 +179,7 @@ REGEXP REGEXP ...)."
 (defun pocket-reader ()
   (interactive)
   (switch-to-buffer (get-buffer-create "*pocket-reader*"))
-  (pocket-reader-mode)
-  (tabulated-list-print 'remember-pos 'update)
-  (run-hooks 'pocket-reader-finalize-hook))
+  (pocket-reader-mode))
 
 ;;;; Functions
 
