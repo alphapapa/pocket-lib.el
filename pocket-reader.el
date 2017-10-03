@@ -158,11 +158,11 @@ REGEXP REGEXP ...)."
 
 (defcustom pocket-reader-finalize-hook
   '(pocket-reader--apply-faces
-    pocket-reader--add-overlays)
+    pocket-reader--add-spacers)
   "Functions run after printing items into the buffer."
   :type 'hook
   :options '(pocket-reader--apply-faces
-             pocket-reader--add-overlays))
+             pocket-reader--add-spacers))
 
 ;;;;;; Faces
 
@@ -601,7 +601,7 @@ Common prefixes like www are removed."
   "Format TIMESTAMP."
   (format-time-string "%Y-%m-%d" timestamp))
 
-(defun pocket-reader--add-overlays (&rest ignore)
+(defun pocket-reader--add-spacers (&rest ignore)
   "Insert overlay spacers where the current sort column's values change.
 For example, if sorted by date, a spacer will be inserted where the date changes."
   (let ((sort-column (seq-position tabulated-list-format tabulated-list-sort-key
