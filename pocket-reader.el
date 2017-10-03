@@ -126,6 +126,7 @@ REGEXP REGEXP ...)."
 
 (defface pocket-reader-unread `((default :weight bold)) "Face for unread items")
 (defface pocket-reader-archived `((default :weight normal)) "Face for archived items")
+(defface pocket-reader-favorite-star `((default :foreground "#b58900")) "Face for archived items")
 
 ;;;; Macros
 
@@ -284,7 +285,8 @@ REGEXP REGEXP ...)."
                               (cl-case action
                                 (favorite "*")
                                 (unfavorite ""))
-                              t))))
+                              t)
+      (pocket-reader--apply-faces-to-line))))
 
 (defun pocket-reader-toggle-archived ()
   "Toggle current item's archived/unread status."
@@ -350,7 +352,26 @@ REGEXP REGEXP ...)."
   (with-pocket-reader
    (when (equal "0" (pocket-reader--get-property :status))
      (add-text-properties (line-beginning-position) (line-end-position)
-                          '(face pocket-reader-unread)))))
+                          '(face pocket-reader-unread)))
+   (when (pocket-reader--get-property :favorite)
+     (pocket-reader--set-column-face "*" 'pocket-reader-favorite-star))))
+
+(defun pocket-reader--set-column-face (column face)
+  "Apply FACE to COLUMN on current line.
+COLUMN may be the column name or number."
+  (let* ((column-num (cl-typecase column
+                       (integer column)
+                       (string (tabulated-list--column-number column))))
+         (column-data (aref tabulated-list-format column-num))
+         (start-pos (+ (line-beginning-position)
+                       (1+ (cl-loop for i from 0 below column-num
+                                    for col-data = (aref tabulated-list-format i)
+                                    for col-width = (elt col-data 1)
+                                    sum col-width))))
+         (column-width (elt column-data 1))
+         (end-pos (+ start-pos column-width)))
+    (with-pocket-reader
+     (add-face-text-property start-pos end-pos face t))))
 
 (defun pocket-reader--action (action &optional arg)
   "Execute ACTION on current item.
