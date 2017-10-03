@@ -208,7 +208,9 @@ REGEXP REGEXP ...)."
             'append 'local)
 
   (setq tabulated-list-sort-key '("Added" . nil))
-  (pocket-reader-search))
+  (pocket-reader-search)
+  ;; Invert initial sort order, putting most recent items on top
+  (tabulated-list-sort 0))
 
 ;;;; Functions
 
@@ -525,7 +527,7 @@ action in the Pocket API."
   (let* ((site-width (cl-loop for item in pocket-reader-items
                               maximizing (length (elt (cadr item) 3))))
          (title-width (- (window-text-width) 11 2 site-width 10 1)))
-    (setq tabulated-list-format (vector (list "Added" 10 nil)
+    (setq tabulated-list-format (vector (list "Added" 10 t)
                                         (list "*" 1 nil) ; FIXME: Sort by star
                                         (list "Title" title-width t)
                                         (list "Site" site-width t)
