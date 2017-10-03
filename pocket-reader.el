@@ -288,9 +288,16 @@ REGEXP REGEXP ...)."
   "Show all excerpts."
   (interactive)
   (save-excursion
-    (while (not (eobp))
-      (pocket-reader-excerpt)
-      (forward-line 1))))
+    (goto-char (point-min))
+    (let ((first-excerpt (pocket-reader--get-property :excerpt)))
+      (if (cl-loop for ov in (ov-forwards)
+                   thereis (ov-val ov 'before-string))
+          ;; Already shown; hide all
+          (ov-clear 'before-string)
+        ;; Show all
+        (while (not (eobp))
+          (pocket-reader-excerpt)
+          (forward-line 1))))))
 
 (defun pocket-reader--wrap-string (string length)
   "Wrap STRING to LENGTH."
