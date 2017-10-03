@@ -505,18 +505,19 @@ Common prefixes like www are removed."
 (defun pocket-reader--add-overlays ()
   "Insert overlay spacers where the current sort column's values change.
 For example, if sorted by date, a spacer will be inserted where the date changes."
-  (let ((column-num (seq-position tabulated-list-format tabulated-list-sort-key
-                                  (lambda (seq elt)
-                                    (string= (car seq) (car elt))))))
+  (let ((sort-column (seq-position tabulated-list-format tabulated-list-sort-key
+                                   (lambda (seq elt)
+                                     (string= (car seq) (car elt))))))
+    (ov-clear)
     (save-excursion
       (goto-char (point-min))
-      (cl-loop with prev-data = (elt (tabulated-list-get-entry) column-num)
+      (cl-loop with prev-data = (elt (tabulated-list-get-entry) sort-column)
                while (not (eobp))
                do (forward-line 1)
-               for current-data = (elt (tabulated-list-get-entry) column-num)
+               for current-data = (elt (tabulated-list-get-entry) sort-column)
                when (not (equal current-data prev-data))
                do (progn
-                    (ov (line-beginning-position) (line-end-position) 'display (format ""))
+                    (ov (line-beginning-position) (line-beginning-position) 'before-string "\n")
                     (setq prev-data current-data))))))
 
 ;;;;;; Faces
