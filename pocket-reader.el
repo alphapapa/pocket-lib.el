@@ -64,6 +64,7 @@
                     "*" pocket-reader-toggle-favorite
                     "f" pocket-reader-toggle-favorite
                     "s" pocket-reader-search
+                    "m" pocket-reader-more
                     "tt" pocket-reader-add-tags
                     "ta" pocket-reader-add-tags
                     "tr" pocket-reader-remove-tags
@@ -76,7 +77,33 @@
 (defvar pocket-reader-items nil
   "Items to be shown.
 This is stored in a var so we can fetch the items and calculate
-settings for tabulated-list-mode based on it.")
+settings for tabulated-list-mode based on it.  NOTE: This may
+become out-of-sync with `tabulated-list-entries', so it should
+not be used outside of functions that already use it.")
+
+(defvar pocket-reader-offset 0
+  "The current offset.")
+
+(defvar pocket-reader-query nil
+  "The current query string.")
+
+(defconst pocket-reader-keys
+  '(:item_id
+    :status
+    :favorite
+    (:tags . pocket-lib--process-tags)
+    :time_added
+    :time_updated
+    :time_read
+    :given_title
+    :resolved_title
+    :excerpt
+    :has_video
+    :has_image
+    :word_count
+    :amp_url
+    :resolved_url)
+  "Keys to use in Pocket API responses, optionally with function to filter each one through.")
 
 ;;;;; Customization
 
@@ -122,6 +149,10 @@ REGEXP REGEXP ...)."
   :options '(pocket-reader--apply-faces
              pocket-reader--add-overlays))
 
+(setq pocket-reader-url-open-fn-map
+      (list (list #'browse-url-chrome
+                  "news.ycombinator.com")))
+
 ;;;;;; Faces
 
 (defface pocket-reader-unread `((default :weight bold)) "Face for unread items")
@@ -136,12 +167,20 @@ REGEXP REGEXP ...)."
      (let ((inhibit-read-only t))
        ,@body)))
 
-(defun pocket-reader--keywords-in-list (list &rest keywords)
+(cl-defmacro pocket-reader--keywords-in-list (list &rest keywords)
   "If any KEYWORDS are in LIST, destructively remove them from LIST and return the last KEYWORD found in LIST."
-  (car (last (cl-loop for keyword in keywords
-                      when (member keyword list)
-                      do (delete keyword list)
-                      and collect (s-replace (rx ":") "" keyword)))))
+  (declare (debug nil))
+  `(car (last (cl-loop for keyword in ',keywords
+                       when (member keyword ,list)
+                       do (setq ,list (delete keyword ,list))
+                       and collect (s-replace (rx ":") "" keyword)))))
+
+(cl-defmacro pocket-reader--regexp-in-list (list regexp &optional (prefix ":"))
+  "If REGEXP matches strings in LIST, destructively remove strings from LIST and return the last string without PREFIX."
+  `(car (last (cl-loop for string in ,list
+                       when (string-match ,regexp string)
+                       do (setq ,list (delete string ,list))
+                       and collect (replace-regexp-in-string (rx-to-string '(seq bos ,prefix)) "" string)))))
 
 ;;;; Mode
 
@@ -149,53 +188,44 @@ REGEXP REGEXP ...)."
   "Pocket Reader"
   :group 'pocket-reader
 
-  (setq pocket-reader-items (pocket-reader-list-entries))
-
-  (pocket-reader--set-tabulated-settings)
-  (setq tabulated-list-entries pocket-reader-items)
   (setq tabulated-list-sort-key '("Added" . nil))
+  (pocket-reader-search))
 
-  (tabulated-list-init-header)
-  (tabulated-list-print 'remember-pos 'update)
-  (run-hooks 'pocket-reader-finalize-hook))
+;;;; Functions
 
-(defconst pocket-reader-keys
-  '(:item_id
-    :status
-    :favorite
-    (:tags . pocket-lib--process-tags)
-    :time_added
-    :time_updated
-    :time_read
-    :given_title
-    :resolved_title
-    :excerpt
-    :has_video
-    :has_image
-    :word_count
-    :amp_url
-    :resolved_url))
+;;;;; Commands
 
 (defun pocket-reader ()
   (interactive)
   (switch-to-buffer (get-buffer-create "*pocket-reader*"))
   (pocket-reader-mode))
 
-;;;; Functions
+(defun pocket-reader-search (&optional query)
+  "Search Pocket items with QUERY."
+  (interactive (list (read-from-minibuffer "Query: ")))
+  (custom-reevaluate-setting 'pocket-reader-show-count)
+  (setq pocket-reader-offset 0)
+  (setq pocket-reader-query query)
+  (setq pocket-reader-items (pocket-reader--get-items query))
+  (pocket-reader--set-tabulated-settings)
+  (setq tabulated-list-entries pocket-reader-items)
+  (tabulated-list-init-header)
+  (tabulated-list-revert)
+  (run-hooks 'pocket-reader-finalize-hook))
 
-;;;;; Commands
+(defun pocket-reader-more (count)
+  "Fetch and show COUNT more items."
+  (interactive "p")
+  (let* ((count (if (= 1 count)
+                    pocket-reader-show-count
+                  count))
+         (offset (incf pocket-reader-offset count))
+         (new-items (pocket-reader--get-items pocket-reader-query)))
+    (setq tabulated-list-entries (append tabulated-list-entries new-items))
+    (tabulated-list-revert)
+    (run-hooks 'pocket-reader-finalize-hook)))
 
-(defun pocket-reader-open-in-external-browser ()
-  (interactive)
-  (let ((pocket-reader-open-url-default-function #'browse-url-default-browser))
-    (call-interactively #'pocket-reader-open-url)))
-
-(defun pocket-reader-copy-url ()
-  "Copy URL of current item to kill-ring/clipboard."
-  (interactive)
-  (when-let ((url (pocket-reader--get-property :resolved_url)))
-    (kill-new url)
-    (message url)))
+;;;;;; Tags
 
 (defun pocket-reader-add-tags (new-tags)
   "Add tags to current item."
@@ -245,6 +275,8 @@ REGEXP REGEXP ...)."
        ;; Fix face
        (pocket-reader--apply-faces-to-line)))))
 
+;;;;;; URL-opening
+
 (defun pocket-reader-open-url (&optional &key fn)
   "Open URL of current item with default function."
   (interactive)
@@ -256,15 +288,17 @@ REGEXP REGEXP ...)."
         (with-pocket-reader
          (pocket-reader-toggle-archived))))))
 
-(defun pocket-reader--map-url-open-fn (url)
-  "Return function to use to open URL."
-  (or (car (cl-rassoc url pocket-reader-url-open-fn-map
-                      :test (lambda (url regexp)
-                              (string-match (rx-to-string `(seq "http" (optional "s") "://"
-                                                                (regexp ,(car regexp))
-                                                                (or "/" eos)))
-                                            url))))
-      pocket-reader-open-url-default-function))
+(defun pocket-reader-open-in-external-browser ()
+  (interactive)
+  (let ((pocket-reader-open-url-default-function #'browse-url-default-browser))
+    (call-interactively #'pocket-reader-open-url)))
+
+(defun pocket-reader-copy-url ()
+  "Copy URL of current item to kill-ring/clipboard."
+  (interactive)
+  (when-let ((url (pocket-reader--get-property :resolved_url)))
+    (kill-new url)
+    (message url)))
 
 (defun pocket-reader-pop-to-url ()
   "Open URL of current item with default pop-to function."
@@ -310,19 +344,19 @@ REGEXP REGEXP ...)."
        (put-text-property (line-beginning-position) (line-end-position)
                           'face face)))))
 
-(defun pocket-reader-search ()
-  "Search Pocket items."
-  (interactive)
-  (let* ((query-words (s-split " " (read-from-minibuffer "Query: ")))
-         (state (pocket-reader--keywords-in-list query-words ":archive" ":all" ":unread"))
-         (favorite (when (pocket-reader--keywords-in-list query-words ":favorite" ":*")
-                     1))
-         (query (s-join " " query-words)))
-    (setq tabulated-list-entries (pocket-reader-list-entries :search query :state state :favorite favorite))
-    (tabulated-list-revert)             ; FIXME: Is this necessary?
-    (run-hooks 'pocket-reader-finalize-hook)))
+
 
 ;;;;; Helpers
+
+(defun pocket-reader--map-url-open-fn (url)
+  "Return function to use to open URL."
+  (or (car (cl-rassoc url pocket-reader-url-open-fn-map
+                      :test (lambda (url regexp)
+                              (string-match (rx-to-string `(seq "http" (optional "s") "://"
+                                                                (regexp ,(car regexp))
+                                                                (or "/" eos)))
+                                            url))))
+      pocket-reader-open-url-default-function))
 
 (defun pocket-reader--set-entry-property (property value)
   "Set current item's PROPERTY to VALUE."
@@ -400,7 +434,15 @@ action in the Pocket API."
   "Return value of PROPERTY for current item."
   (get-text-property 0 property (elt (tabulated-list-get-entry) 2)))
 
-(cl-defun pocket-reader-list-entries (&key search (state "unread") favorite)
+(defun pocket-reader--get-items (&optional query)
+  "Return Pocket items for QUERY.
+QUERY is a string which may contain certain keywords:
+
+:*, :favorite  Return only favorited items.
+:archived      Return only archived items.
+:unread        Return only unread items (default).
+:all           Return all items.
+:COUNT         Return at most COUNT (a number) items."
   ;; This buffer-local variable specifies the entries displayed in the
   ;; Tabulated List buffer.  Its value should be either a list, or a
   ;; function.
@@ -422,10 +464,20 @@ action in the Pocket API."
   ;;   There should be no newlines in any of these strings.
 
   ;; FIXME: Add error handling.
-  (let* ((items (cdr (cl-third (pocket-lib-get
+  (let* ((query (or query ""))
+         (query-words (s-split " " query))
+         (state (pocket-reader--keywords-in-list query-words ":archive" ":all" ":unread"))
+         (favorite (when (pocket-reader--keywords-in-list query-words ":favorite" ":*") 1))
+         (count (setq pocket-reader-show-count
+                      (or (--when-let (pocket-reader--regexp-in-list query-words (rx bos ":" (1+ digit) eos))
+                            (string-to-number it))
+                          pocket-reader-show-count)))
+         (query-string (s-join " " query-words))
+         (items (cdr (cl-third (pocket-lib-get
                                  :detail-type "complete"
-                                 :count pocket-reader-show-count
-                                 :search search
+                                 :count count
+                                 :offset pocket-reader-offset
+                                 :search query-string
                                  :state state
                                  :favorite favorite))))
          (item-plists (--map (cl-loop with item = (kvalist->plist (cdr it))
