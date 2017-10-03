@@ -66,6 +66,7 @@
                     "f" pocket-reader-toggle-favorite
                     "s" pocket-reader-search
                     "m" pocket-reader-more
+                    "l" pocket-reader-limit
                     "tt" pocket-reader-add-tags
                     "ta" pocket-reader-add-tags
                     "tr" pocket-reader-remove-tags
@@ -237,6 +238,19 @@ REGEXP REGEXP ...)."
                   count))
          (offset (incf pocket-reader-offset count)))
     (pocket-reader--add-items (pocket-reader--get-items pocket-reader-query))))
+
+(defun pocket-reader-limit (query)
+  "Limit display to items matching QUERY."
+  (interactive (list (read-from-minibuffer "Query: ")))
+  (if (s-present? query)
+      (save-excursion
+        (goto-char (point-min))
+        (cl-loop while (not (eobp))
+                 unless (re-search-forward query (line-end-position) t)
+                 do (ov (line-beginning-position) (1+ (line-end-position)) 'display "")
+                 do (forward-line 1)))
+    ;; No query; show all entries
+    (ov-clear 'display "")))
 
 ;;;;;; Tags
 
