@@ -6,7 +6,7 @@
 ;; Created: 2017-09-25
 ;; Version: 0.1-pre
 ;; Keywords: pocket
-;; Package-Requires: ((emacs "25.1") (dash "2.13.0") (kv "0.0.19") (pocket-lib "0.1") (s "1.10"))
+;; Package-Requires: ((emacs "25.1") (dash "2.13.0") (kv "0.0.19") (pocket-lib "0.1") (s "1.10") (ov "1.0.6"))
 ;; URL: https://github.com/alphapapa/pocket-reader.el
 
 ;; This file is NOT part of GNU Emacs.
@@ -45,6 +45,7 @@
 
 (require 'dash)
 (require 'kv)
+(require 'ov)
 (require 's)
 
 ;; (require 'pocket-lib)
@@ -113,6 +114,14 @@ are listed first, followed by the regexps, in this format: (FN
 REGEXP REGEXP ...)."
   :type 'list)
 
+(defcustom pocket-reader-finalize-hook
+  '(pocket-reader--apply-faces
+    pocket-reader--add-overlays)
+  "Functions run after printing items into the buffer."
+  :type 'hook
+  :options '(pocket-reader--apply-faces
+             pocket-reader--add-overlays))
+
 ;;;;;; Faces
 
 (defface pocket-reader-unread `((default :weight bold)) "Face for unread items")
@@ -169,9 +178,7 @@ REGEXP REGEXP ...)."
   (switch-to-buffer (get-buffer-create "*pocket-reader*"))
   (pocket-reader-mode)
   (tabulated-list-print 'remember-pos 'update)
-
-  ;; Apply face
-  (pocket-reader-apply-faces))
+  (run-hooks 'pocket-reader-finalize-hook))
 
 ;;;; Functions
 
@@ -310,8 +317,8 @@ REGEXP REGEXP ...)."
                      1))
          (query (s-join " " query-words)))
     (setq tabulated-list-entries (pocket-reader-list-entries :search query :state state :favorite favorite))
-    (tabulated-list-revert)
-    (pocket-reader-apply-faces)))
+    (tabulated-list-revert)             ; FIXME: Is this necessary?
+    (run-hooks 'pocket-reader-finalize-hook)))
 
 ;;;;; Helpers
 
@@ -329,7 +336,7 @@ REGEXP REGEXP ...)."
   "Set tags column for current entry."
   (tabulated-list-set-col 4 (s-join "," (pocket-reader-get-property :tags))))
 
-(defun pocket-reader-apply-faces ()
+(defun pocket-reader--apply-faces ()
   ;; TODO: Maybe we should use a custom print function but this is simpler
   (with-pocket-reader
    (goto-char (point-min))
@@ -452,6 +459,23 @@ Common prefixes like www are removed."
 (defun pocket-reader--format-timestamp (timestamp)
   ""
   (format-time-string "%Y-%m-%d" timestamp))
+
+(defun pocket-reader--add-overlays ()
+  "Insert overlay spacers where the current sort column's values change.
+For example, if sorted by date, a spacer will be inserted where the date changes."
+  (let ((column-num (seq-position tabulated-list-format tabulated-list-sort-key
+                                  (lambda (seq elt)
+                                    (string= (car seq) (car elt))))))
+    (save-excursion
+      (goto-char (point-min))
+      (cl-loop with prev-data = (elt (tabulated-list-get-entry) column-num)
+               while (not (eobp))
+               do (forward-line 1)
+               for current-data = (elt (tabulated-list-get-entry) column-num)
+               when (not (equal current-data prev-data))
+               do (progn
+                    (ov (line-beginning-position) (line-end-position) 'display (format ""))
+                    (setq prev-data current-data))))))
 
 ;;;; Footer
 
