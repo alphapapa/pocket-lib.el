@@ -192,7 +192,7 @@ REGEXP REGEXP ...)."
 (defun pocket-reader-copy-url ()
   "Copy URL of current item to kill-ring/clipboard."
   (interactive)
-  (when-let ((url (pocket-reader-get-property :resolved_url)))
+  (when-let ((url (pocket-reader--get-property :resolved_url)))
     (kill-new url)
     (message url)))
 
@@ -203,7 +203,7 @@ REGEXP REGEXP ...)."
         (new-tags (--> new-tags
                        (s-split " " it 'omit-nulls)
                        (s-join "," it)))
-        (old-tags (pocket-reader-get-property :tags)))
+        (old-tags (pocket-reader--get-property :tags)))
     (when (and new-tags
                (pocket-lib--tags-action 'tags_add new-tags item))
       ;; Tags added successfully
@@ -215,9 +215,9 @@ REGEXP REGEXP ...)."
 
 (defun pocket-reader-remove-tags (remove-tags)
   "Remove tags from current item."
-  (interactive (list (completing-read "Tags: " (pocket-reader-get-property :tags))))
+  (interactive (list (completing-read "Tags: " (pocket-reader--get-property :tags))))
   (let* ((item (pocket-reader--current-item))
-         (old-tags (pocket-reader-get-property :tags))
+         (old-tags (pocket-reader--get-property :tags))
          (remove-tags (s-split " " remove-tags 'omit-nulls))
          (remove-tags-string (s-join "," remove-tags))
          (new-tags (or (seq-difference old-tags remove-tags)
@@ -247,7 +247,7 @@ REGEXP REGEXP ...)."
 (defun pocket-reader-open-url (&optional &key fn)
   "Open URL of current item with default function."
   (interactive)
-  (let* ((url (pocket-reader-get-property :resolved_url))
+  (let* ((url (pocket-reader--get-property :resolved_url))
          (fn (or fn (pocket-reader--map-url-open-fn url))))
     (when (funcall fn url)
       ;; Item opened successfully
@@ -289,7 +289,7 @@ REGEXP REGEXP ...)."
 (defun pocket-reader-toggle-archived ()
   "Toggle current item's archived/unread status."
   (interactive)
-  (let* ((action (pcase (pocket-reader-get-property :status)
+  (let* ((action (pcase (pocket-reader--get-property :status)
                    ;; Unread; archive
                    ("0" 'archive)
                    ;; Archived; readd
@@ -334,7 +334,7 @@ REGEXP REGEXP ...)."
 
 (defun pocket-reader--set-tags-column ()
   "Set tags column for current entry."
-  (tabulated-list-set-col 4 (s-join "," (pocket-reader-get-property :tags))))
+  (tabulated-list-set-col 4 (s-join "," (pocket-reader--get-property :tags))))
 
 (defun pocket-reader--apply-faces ()
   ;; TODO: Maybe we should use a custom print function but this is simpler
@@ -348,7 +348,7 @@ REGEXP REGEXP ...)."
 (defun pocket-reader--apply-faces-to-line ()
   "Apply faces to current line."
   (with-pocket-reader
-   (when (equal "0" (pocket-reader-get-property :status))
+   (when (equal "0" (pocket-reader--get-property :status))
      (add-text-properties (line-beginning-position) (line-end-position)
                           '(face pocket-reader-unread)))))
 
@@ -375,7 +375,7 @@ action in the Pocket API."
                                         (list "Site" site-width t)
                                         (list "Tags" 10 t)))))
 
-(defun pocket-reader-get-property (property)
+(defun pocket-reader--get-property (property)
   "Return value of PROPERTY for current item."
   (get-text-property 0 property (elt (tabulated-list-get-entry) 2)))
 
