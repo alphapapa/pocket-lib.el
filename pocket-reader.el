@@ -61,6 +61,8 @@
                     "a" pocket-reader-toggle-archived
                     "b" pocket-reader-open-in-external-browser
                     "c" pocket-reader-copy-url
+                    "e" pocket-reader-excerpt
+                    "E" pocket-reader-excerpt-all
                     "u" pocket-reader-toggle-archived
                     "*" pocket-reader-toggle-favorite
                     "f" pocket-reader-toggle-favorite
@@ -249,6 +251,54 @@ REGEXP REGEXP ...)."
                  do (forward-line 1)))
     ;; No query; show all entries
     (ov-clear 'display "")))
+
+(defun pocket-reader-excerpt ()
+  "Show excerpt for current item."
+  (interactive)
+  (let ((excerpt (pocket-reader--get-property :excerpt)))
+    (unless (s-blank-str? excerpt)
+      (let* ((start-col (1+ (pocket-reader--column-start "Title")))
+             (prefix (s-repeat start-col " "))
+             (width (- (window-text-width) start-col))
+             (left-margin start-col)
+             (string (concat prefix (s-trim (propertize (pocket-reader--wrap-string excerpt width)
+                                                        'face 'default)) "\n")))
+        (unless (cl-loop for ov in (ov-forwards)
+                         thereis (equal string (ov-val ov 'before-string)))
+          (ov (1+ (line-end-position)) (1+ (line-end-position))
+              'before-string string))))))
+
+(defun pocket-reader--column-start (column)
+  "Return text column that COLUMN starts at on each line."
+  (let* ((column-num (cl-typecase column
+                       (integer column)
+                       (string (tabulated-list--column-number column))))
+         (column-data (aref tabulated-list-format column-num))
+         (start-col (1+ (cl-loop for i from 0 below column-num
+                                 for col-data = (aref tabulated-list-format i)
+                                 for col-width = (elt col-data 1)
+                                 sum col-width)))
+         (column-width (elt column-data 1))
+         (end-pos (+ start-col column-width)))
+    start-col))
+
+(defun pocket-reader-excerpt-all ()
+  "Show all excerpts."
+  (interactive)
+  (save-excursion
+    (while (not (eobp))
+      (pocket-reader-excerpt)
+      (forward-line 1))))
+
+(defun pocket-reader--wrap-string (string length)
+  "Wrap STRING to LENGTH."
+  (if (> (length string) length)
+      (s-trim (with-temp-buffer
+                (insert string)
+                (let ((fill-column length))
+                  (fill-region-as-paragraph (point-min) (point-max))
+                  (buffer-string))))
+    string))
 
 ;;;;;; Tags
 
