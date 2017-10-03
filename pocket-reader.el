@@ -188,6 +188,15 @@ REGEXP REGEXP ...)."
   "Pocket Reader"
   :group 'pocket-reader
 
+  ;; FIXME: Unfortunately I can't get (local 'symbol) to work with
+  ;; `advice-add', and I can't get `add-function' to work either, so I
+  ;; have to use `advice-add', test the buffer each time the advice is
+  ;; called, and delete the advice manually when the buffer is killed.
+  (advice-add 'tabulated-list--sort-by-column-name :after 'pocket-reader--finalize)
+  (add-hook 'kill-buffer-hook (lambda ()
+                                (advice-remove 'tabulated-list--sort-by-column-name 'pocket-reader--finalize))
+            'append 'local)
+
   (setq tabulated-list-sort-key '("Added" . nil))
   (pocket-reader-search))
 
@@ -350,7 +359,13 @@ REGEXP REGEXP ...)."
   (setq tabulated-list-entries pocket-reader-items)
   (tabulated-list-init-header)
   (tabulated-list-revert)
-  (run-hooks 'pocket-reader-finalize-hook))
+  (pocket-reader--finalize))
+
+(defun pocket-reader--finalize (&rest ignore)
+  "Finalize the buffer after adding or sorting items."
+  ;; Make sure it's the pocket-reader buffer.
+  (when (string= "*pocket-reader*" (current-buffer))
+    (run-hooks 'pocket-reader-finalize-hook)))
 
 (defun pocket-reader--get-items (&optional query)
   "Return Pocket items for QUERY.
@@ -502,7 +517,7 @@ Common prefixes like www are removed."
   "Format TIMESTAMP."
   (format-time-string "%Y-%m-%d" timestamp))
 
-(defun pocket-reader--add-overlays ()
+(defun pocket-reader--add-overlays (&rest ignore)
   "Insert overlay spacers where the current sort column's values change.
 For example, if sorted by date, a spacer will be inserted where the date changes."
   (let ((sort-column (seq-position tabulated-list-format tabulated-list-sort-key
