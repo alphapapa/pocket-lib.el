@@ -116,7 +116,7 @@ not be used outside of functions that already use it.")
   "Library for accessing GetPocket.com API."
   :group 'external)
 
-(defcustom pocket-reader-show-url-default-function
+(defcustom pocket-reader-open-url-default-function
   #'org-web-tools-read-url-as-org
   "Default function to open items."
   :type 'function)
