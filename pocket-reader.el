@@ -210,8 +210,9 @@ REGEXP REGEXP ...)."
 
   (setq tabulated-list-sort-key '("Added" . nil))
   (pocket-reader-search)
-  ;; Invert initial sort order, putting most recent items on top
-  (tabulated-list-sort 0))
+  (unless (cdr tabulated-list-sort-key)
+    ;; Invert initial sort order, putting most recent items on top
+    (tabulated-list-sort 0)))
 
 ;;;; Functions
 
