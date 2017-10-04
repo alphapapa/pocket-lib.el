@@ -385,10 +385,12 @@ REGEXP REGEXP ...)."
 
 (defun pocket-reader-open-in-external-browser ()
   (interactive)
-  ;; FIXME: `browse-url-default-browser' doesn't seem to return
-  ;; non-nil (or, at least, the xdg function doesn't), so the item
-  ;; doesn't get archived
-  (pocket-reader-open-url #'browse-url-default-browser))
+  (pocket-reader-open-url
+   :fn (lambda (&rest args)
+         (apply #'browse-url-default-browser args)
+         ;; Return t because the browsing function may not return non-nil
+         ;; when it succeeds, preventing the item from being archived
+         t)))
 
 (defun pocket-reader-copy-url ()
   "Copy URL of current item to kill-ring/clipboard."
