@@ -201,12 +201,24 @@ REGEXP REGEXP ...)."
                        do (setq ,list (delete string ,list))
                        and collect (replace-regexp-in-string (rx-to-string '(seq bos ,prefix)) "" string)))))
 
+(defmacro pocket-reader--at-item (id &rest body)
+  "Eval BODY with point at item ID."
+  (declare (indent defun))
+  (with-pocket-reader
+   (save-excursion
+     (goto-char (point-min))
+     (when (cl-loop while (not (eobp))
+                    when (equal (tabulated-list-get-id) id)
+                    return t
+                    do (forward-line 1))
+       ,@body))))
+
 (defmacro pocket-reader--with-marked-or-current-items (&rest body)
   "Execute BODY at each marked item, or current item if none are marked."
   `(if pocket-reader-mark-overlays
        ;; Marked items
        (cl-loop for (id . ov) in pocket-reader-mark-overlays
-                do (pocket-reader--with-item id
+                do (pocket-reader--at-item id
                      ,@body))
      ;; Current item
      ,@body))
@@ -484,7 +496,7 @@ REGEXP REGEXP ...)."
 
 (defun pocket-reader--delete-item (id)
   "Delete item by ID."
-  (pocket-reader--with-item id
+  (pocket-reader--at-item id
     (when (pocket-lib-delete (pocket-reader--current-item))
       (setq pocket-reader-items (cl-remove id pocket-reader-items
                                            :test #'string= :key #'car))
@@ -660,7 +672,7 @@ For example, if sorted by date, a spacer will be inserted where the date changes
 (defun pocket-reader--mark-item (id)
   "Mark item by ID.
 This function assumes that the item is not already marked."
-  (pocket-reader--with-item id
+  (pocket-reader--at-item id
     (let ((cons (cons id (ov (line-beginning-position) (line-end-position)
                              'face 'highlight))))
       (push cons pocket-reader-mark-overlays))))
