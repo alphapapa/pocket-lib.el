@@ -6,7 +6,7 @@
 ;; Created: 2017-09-25
 ;; Version: 0.1-pre
 ;; Keywords: pocket
-;; Package-Requires: ((emacs "25.1") (dash "2.13.0") (kv "0.0.19") (pocket-lib "0.1") (s "1.10") (ov "1.0.6") (rainbow-identifiers "0.2.2"))
+;; Package-Requires: ((emacs "25.1") (dash "2.13.0") (kv "0.0.19") (pocket-lib "0.1") (s "1.10") (ov "1.0.6") (rainbow-identifiers "0.2.2") (org-web-tools "0.1"))
 ;; URL: https://github.com/alphapapa/pocket-reader.el
 
 ;; This file is NOT part of GNU Emacs.
@@ -26,13 +26,6 @@
 
 ;;; Commentary:
 
-;; This package is based on pocket-api.el by DarkSun/lujun9972 at
-;; <https://github.com/lujun9972/pocket-api.el>, which is based on
-;; el-pocket by Tod Davies at <https://github.com/pterygota/el-pocket>.
-
-;; It has essentially been completely written; no code remains except
-;; `pocket-reader-default-extra-headers' a few lines in the call to
-;; `request', and the consumer-key is currently the same.
 
 
 ;;; Code:
