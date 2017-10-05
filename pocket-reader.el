@@ -292,6 +292,7 @@ a column in the list)."
   ;; When QUERY is nil, it simply shows the default list of unread items.
   (interactive (list (read-from-minibuffer "Query: ")))
   (custom-reevaluate-setting 'pocket-reader-show-count)
+  (pocket-reader-unmark-all)
   (setq pocket-reader-offset 0
         pocket-reader-query query
         pocket-reader-items nil)
