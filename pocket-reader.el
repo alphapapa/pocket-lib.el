@@ -202,9 +202,12 @@ REGEXP REGEXP ...)."
                        and collect (replace-regexp-in-string (rx-to-string '(seq bos ,prefix)) "" string)))))
 
 (defmacro pocket-reader--at-item (id &rest body)
-  "Eval BODY with point at item ID."
-  (declare (indent defun) (debug (integer &rest body)))
+  "Eval BODY with point at item ID.
+If ID is an integer, convert it to a string."
+  (declare (indent defun) (debug (symbolp body)))
   `(with-pocket-reader
+    (when (integerp id)
+      (setq id (number-to-string id)))
     (save-excursion
       (goto-char (point-min))
       (cl-loop while (not (eobp))
@@ -223,6 +226,39 @@ REGEXP REGEXP ...)."
                      ,@body))
      ;; Current item
      ,@body))
+
+(cl-defmacro pocket-reader--toggle (toggles &key test at-item)
+  "Toggle status of marked or current items.
+
+TOGGLES should be a cons cell with each item a symbol naming
+opposing actions in the Pocket API, such as (ARCHIVE . READD).
+
+TEST should be a lisp form to evaluate at each item in the list.
+If non-nil, the item will be added to a list for the first
+action, otherwise for the second.
+
+AT-ITEM should be a lisp form which will be run at each item
+after the actions are completed (e.g. this can be used to update
+a column in the list)."
+  (declare (indent defun) (debug (consp ":test" form ":at-item" form)))
+  `(let ((actions (cons nil nil)))
+     ;; Add items to list of toggle actions
+     (cl-loop for item in (pocket-reader--marked-or-current-items)
+              for id = (number-to-string (alist-get 'item_id item))
+              do (pocket-reader--at-item id
+                   (if ,test
+                       (push item (car actions))
+                     (push item (cdr actions)))))
+     ;; Process actions
+     ;; FIXME: `symbol-value' doesn't work with lexical binding?  So I
+     ;; have to make this list myself?  Weird...
+     (cl-loop for (action . items) in (list (cons (car ,toggles) (car actions))
+                                            (cons (cdr ,toggles) (cdr actions)))
+              when (and items (apply #'pocket-lib--action action items))
+              do (cl-loop for item in items
+                          for id = (number-to-string (alist-get 'item_id item))
+                          do (pocket-reader--at-item id
+                               ,at-item)))))
 
 ;;;; Mode
 
@@ -446,43 +482,28 @@ REGEXP REGEXP ...)."
     (apply #'pocket-reader--delete-items (pocket-reader--marked-or-current-items))))
 
 (defun pocket-reader-toggle-favorite ()
-  "Toggle current item's favorite status."
+  "Toggle current or marked items' favorite status."
   (interactive)
-  (pocket-reader--at-marked-or-current-items
-   (let ((action (if (string-empty-p (elt (tabulated-list-get-entry) 1))
-                     ;; Not favorited; add it
-                     'favorite
-                   ;; Favorited; remove it
-                   'unfavorite)))
-     (when (pocket-reader--action action)
-       ;; Item successfully toggled
-       (tabulated-list-set-col 1
-                               (cl-case action
-                                 (favorite "*")
-                                 (unfavorite ""))
-                               t)
-       (pocket-reader--apply-faces-to-line)))))
+  (pocket-reader--toggle '(favorite . unfavorite)
+    :test (string-empty-p (elt (tabulated-list-get-entry) 1))
+    :at-item (progn
+               (tabulated-list-set-col 1 (cl-case action
+                                           ('favorite "*")
+                                           ('unfavorite ""))
+                                       t)
+               (pocket-reader--apply-faces-to-line))))
+
 
 (defun pocket-reader-toggle-archived ()
-  "Toggle current item's archived/unread status."
+  "Toggle current or marked items' archived/unread status."
   (interactive)
-  (pocket-reader--at-marked-or-current-items
-   (let* ((action (pcase (pocket-reader--get-property :status)
-                    ;; Unread; archive
-                    ("0" 'archive)
-                    ;; Archived; readd
-                    ("1" 'readd)))
-          (face (cl-case action
-                  ('archive 'pocket-reader-archived)
-                  ('readd 'pocket-reader-unread)))
-          (status (cl-case action
-                    ('archive "1")
-                    ('readd "0"))))
-     (when (pocket-reader--action action)
-       ;; Item successfully toggled
-       (with-pocket-reader
-        (pocket-reader--set-entry-property :status status)
-        (pocket-reader--apply-faces-to-line))))))
+  (pocket-reader--toggle '(archive . readd)
+    :test (string= "0" (pocket-reader--get-property :status))
+    :at-item (progn
+               (pocket-reader--set-entry-property :status (cl-case action
+                                                            ('archive "1")
+                                                            ('readd "0")))
+               (pocket-reader--apply-faces-to-line))))
 
 ;;;;; Helpers
 
@@ -501,7 +522,7 @@ Items should be a list of items as returned by
 `pocket-reader--marked-or-current-items'."
   (when (apply #'pocket-lib-delete items)
     (cl-loop for item in items
-             for id = (alist-get 'item_id item)
+             for id = (number-to-string (alist-get 'item_id item))
              do (progn
                   (pocket-reader--unmark-item id)
                   (setq pocket-reader-items (cl-remove id pocket-reader-items
@@ -602,10 +623,10 @@ action in the Pocket API."
    (apply #'pocket-lib--action action (pocket-reader--marked-or-current-items))))
 
 (defun pocket-reader--marked-or-current-items ()
-  "Return marked items or current items, suitable for pocket-lib."
+  "Return marked or current items, suitable for pocket-lib."
   (or (cl-loop for (id . ov) in pocket-reader-mark-overlays
-               collect (list (cons 'item_id id)))
-      (pocket-reader--current-item)))
+               collect (list (cons 'item_id (string-to-number id))))
+      (list (pocket-reader--current-item))))
 
 (defun pocket-reader--set-tags-column ()
   "Set tags column for current entry."
@@ -745,7 +766,7 @@ For example, if sorted by date, a spacer will be inserted where the date changes
    (add-text-properties (line-beginning-position) (line-end-position)
                         (list 'face (pcase (pocket-reader--get-property :status)
                                       ("0" 'pocket-reader-unread)
-                                      ("1" 'pocket-reader-read)) ))
+                                      ("1" 'pocket-reader-archived)) ))
    (when (pocket-reader--get-property :favorite)
      (pocket-reader--set-column-face "*" 'pocket-reader-favorite-star))
    (when (or pocket-reader-color-site
