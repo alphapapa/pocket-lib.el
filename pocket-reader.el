@@ -65,12 +65,13 @@
                     "D" pocket-reader-delete
                     "e" pocket-reader-excerpt
                     "E" pocket-reader-excerpt-all
-                    "u" pocket-reader-toggle-archived
                     "*" pocket-reader-toggle-favorite
                     "f" pocket-reader-toggle-favorite
                     "F" pocket-reader-show-unread-favorites
                     "s" pocket-reader-search
-                    "m" pocket-reader-more
+                    "m" pocket-reader-toggle-mark
+                    "U" pocket-reader-unmark-all
+                    "M" pocket-reader-more
                     "l" pocket-reader-limit
                     "tt" pocket-reader-add-tags
                     "ta" pocket-reader-add-tags
@@ -93,6 +94,11 @@ not be used outside of functions that already use it.")
 
 (defvar pocket-reader-query nil
   "The current query string.")
+
+(defvar pocket-reader-mark-overlays nil
+  "List of overlays used to mark items.
+Each item in the list is a cons cell whose first element is the
+item ID and second is the overlay used to mark it.")
 
 (defconst pocket-reader-keys
   '(:item_id
@@ -322,6 +328,25 @@ REGEXP REGEXP ...)."
                   (fill-region-as-paragraph (point-min) (point-max))
                   (buffer-string))))
     string))
+
+;;;;;; Marking
+
+(defun pocket-reader-toggle-mark ()
+  "Toggle mark on current item."
+  (interactive)
+  (let ((id (tabulated-list-get-id)))
+    (if (member id pocket-reader-marked-items)
+        ;; Marked; unmark
+        (pocket-reader--unmark-item id)
+      ;; Unmarked; mark
+      (pocket-reader--mark-item id))
+    (forward-line 1)))
+
+(defun pocket-reader-unmark-all ()
+  "Unmark all items."
+  (interactive)
+  (cl-loop for (id . ov) in pocket-reader-mark-overlays
+           do (pocket-reader--unmark-item id)))
 
 ;;;;;; Tags
 
@@ -655,6 +680,22 @@ For example, if sorted by date, a spacer will be inserted where the date changes
                do (progn
                     (ov (line-beginning-position) (line-beginning-position) 'before-string "\n")
                     (setq prev-data current-data))))))
+
+;;;;;; Marking
+
+(defun pocket-reader--mark-item (id)
+  "Mark item by ID.
+This function assumes that the item is not already marked."
+  (pocket-reader--with-item id
+    (let ((cons (cons id (ov (line-beginning-position) (line-end-position)
+                             'face 'highlight))))
+      (push cons pocket-reader-mark-overlays))))
+
+(defun pocket-reader--unmark-item (id)
+  "Unmark item by ID."
+  (let ((ov (alist-get id pocket-reader-mark-overlays)))
+    (ov-reset ov))
+  (setq pocket-reader-mark-overlays (cl-remove id pocket-reader-mark-overlays :test #'string= :key #'car)))
 
 ;;;;;; Faces
 
