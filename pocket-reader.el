@@ -496,13 +496,15 @@ a column in the list)."
 (defun pocket-reader-toggle-archived ()
   "Toggle current or marked items' archived/unread status."
   (interactive)
-  (pocket-reader--toggle '(archive . readd)
-    :test (string= "0" (pocket-reader--get-property :status))
-    :at-item (progn
-               (pocket-reader--set-property :status (cl-case action
-                                                      ('archive "1")
-                                                      ('readd "0")))
-               (pocket-reader--apply-faces-to-line))))
+  (cl-loop for item in (pocket-reader--marked-or-current-items)
+           if (pocket-reader--at-item item
+                (pocket-reader--is-archived))
+           collect item into readds
+           else collect item into archives
+           finally do (when readds
+                        (apply #'pocket-reader--readd-items readds))
+           finally do (when archives
+                        (apply #'pocket-reader--archive-items archives))))
 
 ;;;;; Helpers
 
@@ -699,6 +701,28 @@ For example, if sorted by date, a spacer will be inserted where the date changes
                do (progn
                     (ov (line-beginning-position) (line-beginning-position) 'before-string "\n")
                     (setq prev-data current-data))))))
+
+;;;;;; Archived/readd
+
+(defun pocket-reader--archive-items (&rest items)
+  "Mark ITEMS as archived."
+  (when (pocket-lib-archive items)
+    (--map (pocket-reader--at-item it
+             (pocket-reader--set-property :status "1")
+             (pocket-reader--apply-faces-to-line))
+           items)))
+
+(defun pocket-reader--readd-items (&rest items)
+  "Readd ITEMS."
+  (when (pocket-lib-readd items)
+    (--map (pocket-reader--at-item it
+             (pocket-reader--set-property :status "0")
+             (pocket-reader--apply-faces-to-line))
+           items)))
+
+(defun pocket-reader--is-archived ()
+  "Return non-nil if current item is archived."
+  (string= "1" (pocket-reader--get-property :status)))
 
 ;;;;;; Favorites
 
