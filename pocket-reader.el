@@ -398,8 +398,8 @@ a column in the list)."
      (when (and new-tags
                 (pocket-lib--tags-action 'tags_add new-tags item))
        ;; Tags added successfully
-       (pocket-reader--set-entry-property :tags (append (s-split "," new-tags)
-                                                        old-tags))
+       (pocket-reader--set-property :tags (append (s-split "," new-tags)
+                                                  old-tags))
        (pocket-reader--set-tags-column)
        ;; Fix face
        (pocket-reader--apply-faces-to-line)))))
@@ -417,7 +417,7 @@ a column in the list)."
      (when (and remove-tags
                 (pocket-lib--tags-action 'tags_remove remove-tags-string item))
        ;; Tags removed successfully
-       (pocket-reader--set-entry-property :tags new-tags)
+       (pocket-reader--set-property :tags new-tags)
        (pocket-reader--set-tags-column)
        ;; Fix face
        (pocket-reader--apply-faces-to-line)))))
@@ -432,7 +432,7 @@ a column in the list)."
      (pocket-reader--at-marked-or-current-items
       (when (pocket-lib--tags-action 'tags_replace tags-string item)
         ;; Tags replaced successfully
-        (pocket-reader--set-entry-property :tags tags)
+        (pocket-reader--set-property :tags tags)
         (pocket-reader--set-tags-column)
         ;; Fix face
         (pocket-reader--apply-faces-to-line))))))
@@ -499,9 +499,9 @@ a column in the list)."
   (pocket-reader--toggle '(archive . readd)
     :test (string= "0" (pocket-reader--get-property :status))
     :at-item (progn
-               (pocket-reader--set-entry-property :status (cl-case action
-                                                            ('archive "1")
-                                                            ('readd "0")))
+               (pocket-reader--set-property :status (cl-case action
+                                                      ('archive "1")
+                                                      ('readd "0")))
                (pocket-reader--apply-faces-to-line))))
 
 ;;;;; Helpers
@@ -661,7 +661,7 @@ action in the Pocket API."
   "Return value of PROPERTY for current item."
   (get-text-property 0 property (elt (tabulated-list-get-entry) 2)))
 
-(defun pocket-reader--set-entry-property (property value)
+(defun pocket-reader--set-property (property value)
   "Set current item's PROPERTY to VALUE."
   ;; Properties are stored in the title column
   (with-pocket-reader
@@ -706,6 +706,7 @@ For example, if sorted by date, a spacer will be inserted where the date changes
   "Mark ITEMS as favorites."
   (when (pocket-lib-favorite items)
     (--map (pocket-reader--at-item it
+             (pocket-reader--set-property :favorite "1")
              (pocket-reader--update-favorite-display t))
            items)))
 
@@ -713,19 +714,17 @@ For example, if sorted by date, a spacer will be inserted where the date changes
   "Unmark ITEMS as favorites."
   (when (pocket-lib-unfavorite items)
     (--map (pocket-reader--at-item it
+             (pocket-reader--set-property :favorite "0")
              (pocket-reader--update-favorite-display nil))
            items)))
 
 (defun pocket-reader--is-favorite ()
   "Return non-nil if current item is a favorite."
-  (string= "*" (elt (tabulated-list-get-entry) 1)))
+  (string= "1" (pocket-reader--get-property :favorite)))
 
 (defun pocket-reader--update-favorite-display (is-favorite)
   "Update favorite star for current item."
-  (tabulated-list-set-col 1 (if is-favorite
-                                "*"
-                              "")
-                          t)
+  (tabulated-list-set-col 1 (if is-favorite "*" "") t)
   (pocket-reader--apply-faces-to-line))
 
 ;;;;;; Marking
