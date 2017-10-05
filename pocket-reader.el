@@ -203,12 +203,13 @@ If ID is an integer, convert it to a string."
       (setq id (number-to-string id)))
     (save-excursion
       (goto-char (point-min))
-      (cl-loop while (not (eobp))
-               when (equal (tabulated-list-get-id) ,id)
-               do (progn
-                    ,@body)
-               and return nil
-               do (forward-line 1)))))
+      (when (cl-loop while (not (eobp))
+                     when (equal (tabulated-list-get-id) ,id)
+                     do (progn
+                          ,@body)
+                     and return nil
+                     do (forward-line 1))
+        (error ("Item ID not found: %s" id))))))
 
 (defmacro pocket-reader--at-marked-or-current-items (&rest body)
   "Execute BODY at each marked item, or current item if none are marked."
