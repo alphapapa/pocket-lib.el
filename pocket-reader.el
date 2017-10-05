@@ -334,11 +334,12 @@ REGEXP REGEXP ...)."
   "Toggle mark on current item."
   (interactive)
   (let ((id (tabulated-list-get-id)))
-    (if (member id pocket-reader-marked-items)
+    (if (cl-member id pocket-reader-mark-overlays
+                   :test #'string= :key #'car)
         ;; Marked; unmark
         (pocket-reader--unmark-item id)
       ;; Unmarked; mark
-      (pocket-reader--mark-item id))
+      (pocket-reader--mark-current-item))
     (forward-line 1)))
 
 (defun pocket-reader-unmark-all ()
@@ -669,13 +670,12 @@ For example, if sorted by date, a spacer will be inserted where the date changes
 
 ;;;;;; Marking
 
-(defun pocket-reader--mark-item (id)
-  "Mark item by ID.
-This function assumes that the item is not already marked."
-  (pocket-reader--at-item id
-    (let ((cons (cons id (ov (line-beginning-position) (line-end-position)
-                             'face 'highlight))))
-      (push cons pocket-reader-mark-overlays))))
+(defun pocket-reader--mark-current-item ()
+  "Mark current item."
+  (let* ((id (tabulated-list-get-id))
+         (cons (cons id (ov (line-beginning-position) (line-end-position)
+                            'face 'highlight))))
+    (push cons pocket-reader-mark-overlays)))
 
 (defun pocket-reader--unmark-item (id)
   "Unmark item by ID."
