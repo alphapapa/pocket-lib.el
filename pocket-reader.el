@@ -483,10 +483,11 @@ REGEXP REGEXP ...)."
 QUERY is a string which may contain certain keywords:
 
 :*, :favorite  Return only favorited items.
-:archive      Return only archived items.
+:archive       Return only archived items.
 :unread        Return only unread items (default).
 :all           Return all items.
-:COUNT         Return at most COUNT (a number) items."
+:COUNT         Return at most COUNT (a number) items.
+:t:TAG         Return items with TAG (only one tag may be searched for)."
   ;; This buffer-local variable specifies the entries displayed in the
   ;; Tabulated List buffer.  Its value should be either a list, or a
   ;; function.
@@ -516,6 +517,7 @@ QUERY is a string which may contain certain keywords:
                       (or (--when-let (pocket-reader--regexp-in-list query-words (rx bos ":" (1+ digit) eos))
                             (string-to-number it))
                           pocket-reader-show-count)))
+         (tag (pocket-reader--regexp-in-list query-words (rx bos ":t:" (1+ word) eos) ":t:"))
          (query-string (s-join " " query-words))
          (items (cdr (cl-third (pocket-lib-get
                                  :detail-type "complete"
@@ -523,7 +525,8 @@ QUERY is a string which may contain certain keywords:
                                  :offset pocket-reader-offset
                                  :search query-string
                                  :state state
-                                 :favorite favorite))))
+                                 :favorite favorite
+                                 :tag tag))))
          (item-plists (--map (cl-loop with item = (kvalist->plist (cdr it))
                                       for key in pocket-reader-keys
                                       for fn = nil
