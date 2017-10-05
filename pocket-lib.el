@@ -274,6 +274,18 @@ TAGS may be a list of strings or nil."
   ;; the minibuffer if the API command gives an error.
   (apply #'pocket-lib--action 'delete items))
 
+(defun pocket-lib-favorite (&rest items)
+  "Mark ITEMS as favorites."
+  ;; MAYBE: Needs error handling...maybe.  It does give an error in
+  ;; the minibuffer if the API command gives an error.
+  (apply #'pocket-lib--action 'favorite items))
+
+(defun pocket-lib-unfavorite (&rest items)
+  "Unmark ITEMS as favorites."
+  ;; MAYBE: Needs error handling...maybe.  It does give an error in
+  ;; the minibuffer if the API command gives an error.
+  (apply #'pocket-lib--action 'unfavorite items))
+
 (defun pocket-lib--tags-action (action tags &rest items)
   "Execute tag ACTION on ITEMS with TAGS."
   (let ((action (cl-typecase action

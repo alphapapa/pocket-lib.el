@@ -194,22 +194,24 @@ REGEXP REGEXP ...)."
                        do (setq ,list (delete string ,list))
                        and collect (replace-regexp-in-string (rx-to-string '(seq bos ,prefix)) "" string)))))
 
-(defmacro pocket-reader--at-item (id &rest body)
-  "Eval BODY with point at item ID.
-If ID is an integer, convert it to a string."
+(defmacro pocket-reader--at-item (id-or-item &rest body)
+  "Eval BODY with point at item ID-OR-ITEM.
+If ID-OR-ITEM is an integer, convert it to a string.  If it's an
+alist, get the `item-id' from it."
   (declare (indent defun) (debug (symbolp body)))
   `(with-pocket-reader
-    (when (integerp id)
-      (setq id (number-to-string id)))
-    (save-excursion
-      (goto-char (point-min))
-      (when (cl-loop while (not (eobp))
-                     when (equal (tabulated-list-get-id) ,id)
-                     do (progn
+    (let ((id (cl-typecase ,id-or-item
+                (list (number-to-string (alist-get 'item_id ,id-or-item)))
+                (integer (number-to-string ,id-or-item))
+                (string ,id-or-item))))
+      (save-excursion
+        (goto-char (point-min))
+        (cl-loop while (not (eobp))
+                 when (equal (tabulated-list-get-id) id)
+                 return (progn
                           ,@body)
-                     and return nil
-                     do (forward-line 1))
-        (error ("Item ID not found: %s" id))))))
+                 do (forward-line 1)
+                 finally do (error "Item ID not found: %s" id))))))
 
 (defmacro pocket-reader--at-marked-or-current-items (&rest body)
   "Execute BODY at each marked item, or current item if none are marked."
@@ -481,15 +483,15 @@ a column in the list)."
 (defun pocket-reader-toggle-favorite ()
   "Toggle current or marked items' favorite status."
   (interactive)
-  (pocket-reader--toggle '(favorite . unfavorite)
-    :test (string-empty-p (elt (tabulated-list-get-entry) 1))
-    :at-item (progn
-               (tabulated-list-set-col 1 (cl-case action
-                                           ('favorite "*")
-                                           ('unfavorite ""))
-                                       t)
-               (pocket-reader--apply-faces-to-line))))
-
+  (cl-loop for item in (pocket-reader--marked-or-current-items)
+           if (pocket-reader--at-item item
+                (pocket-reader--is-favorite))
+           collect item into unfavorites
+           else collect item into favorites
+           finally do (when favorites
+                        (apply #'pocket-reader--favorite-items favorites))
+           finally do (when unfavorites
+                        (apply #'pocket-reader--unfavorite-items unfavorites))))
 
 (defun pocket-reader-toggle-archived ()
   "Toggle current or marked items' archived/unread status."
@@ -697,6 +699,34 @@ For example, if sorted by date, a spacer will be inserted where the date changes
                do (progn
                     (ov (line-beginning-position) (line-beginning-position) 'before-string "\n")
                     (setq prev-data current-data))))))
+
+;;;;;; Favorites
+
+(defun pocket-reader--favorite-items (&rest items)
+  "Mark ITEMS as favorites."
+  (when (pocket-lib-favorite items)
+    (--map (pocket-reader--at-item it
+             (pocket-reader--update-favorite-display t))
+           items)))
+
+(defun pocket-reader--unfavorite-items (&rest items)
+  "Unmark ITEMS as favorites."
+  (when (pocket-lib-unfavorite items)
+    (--map (pocket-reader--at-item it
+             (pocket-reader--update-favorite-display nil))
+           items)))
+
+(defun pocket-reader--is-favorite ()
+  "Return non-nil if current item is a favorite."
+  (string= "*" (elt (tabulated-list-get-entry) 1)))
+
+(defun pocket-reader--update-favorite-display (is-favorite)
+  "Update favorite star for current item."
+  (tabulated-list-set-col 1 (if is-favorite
+                                "*"
+                              "")
+                          t)
+  (pocket-reader--apply-faces-to-line))
 
 ;;;;;; Marking
 
