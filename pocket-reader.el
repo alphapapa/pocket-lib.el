@@ -62,6 +62,7 @@
                     "a" pocket-reader-toggle-archived
                     "b" pocket-reader-open-in-external-browser
                     "c" pocket-reader-copy-url
+                    "D" pocket-reader-delete
                     "e" pocket-reader-excerpt
                     "E" pocket-reader-excerpt-all
                     "u" pocket-reader-toggle-archived
@@ -402,6 +403,12 @@ REGEXP REGEXP ...)."
 
 ;;;;;; Other
 
+(defun pocket-reader-delete ()
+  "Delete current item (with confirmation)."
+  (interactive)
+  (when (yes-or-no-p "Delete item?")
+    (pocket-reader--delete-item (tabulated-list-get-id))))
+
 (defun pocket-reader-toggle-favorite ()
   "Toggle current item's favorite status."
   (interactive)
@@ -449,6 +456,15 @@ REGEXP REGEXP ...)."
   (tabulated-list-init-header)
   (tabulated-list-revert)
   (pocket-reader--finalize))
+
+(defun pocket-reader--delete-item (id)
+  "Delete item by ID."
+  (pocket-reader--with-item id
+    (when (pocket-lib-delete (pocket-reader--current-item))
+      (setq pocket-reader-items (cl-remove id pocket-reader-items
+                                           :test #'string= :key #'car))
+      (setq tabulated-list-entries pocket-reader-items)
+      (tabulated-list-delete-entry))))
 
 (defun pocket-reader--finalize (&rest ignore)
   "Finalize the buffer after adding or sorting items."
