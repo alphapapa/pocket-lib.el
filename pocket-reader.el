@@ -381,6 +381,9 @@ a column in the list)."
 
 ;;;;;; Tags
 
+;; FIXME: These need to be updated to act on multiple items at once
+;; instead of one-at-a-time.
+
 (defun pocket-reader-add-tags (new-tags)
   "Add tags to current item."
   (interactive (list (read-from-minibuffer "Tags: ")))
