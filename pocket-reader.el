@@ -68,6 +68,7 @@
                     "u" pocket-reader-toggle-archived
                     "*" pocket-reader-toggle-favorite
                     "f" pocket-reader-toggle-favorite
+                    "F" pocket-reader-show-unread-favorites
                     "s" pocket-reader-search
                     "m" pocket-reader-more
                     "l" pocket-reader-limit
@@ -234,6 +235,11 @@ REGEXP REGEXP ...)."
         pocket-reader-query query
         pocket-reader-items nil)
   (pocket-reader--add-items (pocket-reader--get-items query)))
+
+(defun pocket-reader-show-unread-favorites ()
+  "Show unread favorite items."
+  (interactive)
+  (pocket-reader-search ":* :unread"))
 
 (defun pocket-reader-more (count)
   "Fetch and show COUNT more items."
