@@ -540,9 +540,10 @@ QUERY is a string which may contain certain keywords:
                                       append (list key val))
                              items)))
     (cl-loop for it in item-plists
-             for title = (pocket-reader--not-empty-string (apply #'propertize (or (plist-get it :resolved_title)
-                                                                                  (plist-get it :given_title)
-                                                                                  "[untitled]")
+             for title = (pocket-reader--not-empty-string (apply #'propertize (pocket-reader--or-string-not-blank
+                                                                               (plist-get it :resolved_title)
+                                                                               (plist-get it :given_title)
+                                                                               "[untitled]")
                                                                  (cl-loop for key in pocket-reader-keys
                                                                           when (consp key)
                                                                           do (setq key (car key))
@@ -614,6 +615,12 @@ action in the Pocket API."
   (if (string-empty-p s)
       " "
     s))
+
+(defun pocket-reader--or-string-not-blank (&rest strings)
+  "Return first non-empty string in STRINGS."
+  (cl-loop for string in strings
+           when (and string (not (s-blank-str? string)))
+           return string))
 
 (defun pocket-reader--url-domain (url)
   "Return domain for URL.
