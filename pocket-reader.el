@@ -203,17 +203,18 @@ REGEXP REGEXP ...)."
 
 (defmacro pocket-reader--at-item (id &rest body)
   "Eval BODY with point at item ID."
-  (declare (indent defun))
-  (with-pocket-reader
-   (save-excursion
-     (goto-char (point-min))
-     (when (cl-loop while (not (eobp))
-                    when (equal (tabulated-list-get-id) id)
-                    return t
-                    do (forward-line 1))
-       ,@body))))
+  (declare (indent defun) (debug (integer &rest body)))
+  `(with-pocket-reader
+    (save-excursion
+      (goto-char (point-min))
+      (cl-loop while (not (eobp))
+               when (equal (tabulated-list-get-id) ,id)
+               do (progn
+                    ,@body)
+               and return nil
+               do (forward-line 1)))))
 
-(defmacro pocket-reader--with-marked-or-current-items (&rest body)
+(defmacro pocket-reader--at-marked-or-current-items (&rest body)
   "Execute BODY at each marked item, or current item if none are marked."
   `(if pocket-reader-mark-overlays
        ;; Marked items
@@ -294,7 +295,7 @@ REGEXP REGEXP ...)."
 (defun pocket-reader-excerpt ()
   "Show excerpt for current item."
   (interactive)
-  (pocket-reader--with-marked-or-current-items
+  (pocket-reader--at-marked-or-current-items
    (let ((excerpt (pocket-reader--get-property :excerpt)))
      (unless (s-blank-str? excerpt)
        (let* ((start-col (1+ (cl-second (pocket-reader--column-data "Title"))))
@@ -358,7 +359,7 @@ REGEXP REGEXP ...)."
                        (s-split " " it 'omit-nulls)
                        (s-join "," it)))
         (old-tags (pocket-reader--get-property :tags)))
-    (pocket-reader--with-marked-or-current-items
+    (pocket-reader--at-marked-or-current-items
      (when (and new-tags
                 (pocket-lib--tags-action 'tags_add new-tags item))
        ;; Tags added successfully
@@ -377,7 +378,7 @@ REGEXP REGEXP ...)."
          (remove-tags-string (s-join "," remove-tags))
          (new-tags (or (seq-difference old-tags remove-tags)
                        '(" "))))
-    (pocket-reader--with-marked-or-current-items
+    (pocket-reader--at-marked-or-current-items
      (when (and remove-tags
                 (pocket-lib--tags-action 'tags_remove remove-tags-string item))
        ;; Tags removed successfully
@@ -393,7 +394,7 @@ REGEXP REGEXP ...)."
    (let* ((item (pocket-reader--current-item))
           (tags (s-split " " tags 'omit-nulls))
           (tags-string (s-join "," tags)))
-     (pocket-reader--with-marked-or-current-items
+     (pocket-reader--at-marked-or-current-items
       (when (pocket-lib--tags-action 'tags_replace tags-string item)
         ;; Tags replaced successfully
         (pocket-reader--set-entry-property :tags tags)
@@ -406,7 +407,7 @@ REGEXP REGEXP ...)."
 (defun pocket-reader-open-url (&optional &key fn)
   "Open URL of current item with default function."
   (interactive)
-  (pocket-reader--with-marked-or-current-items
+  (pocket-reader--at-marked-or-current-items
    (let* ((url (pocket-reader--get-property :resolved_url))
           (fn (or fn (pocket-reader--map-url-open-fn url))))
      (when (funcall fn url)
@@ -439,16 +440,15 @@ REGEXP REGEXP ...)."
 ;;;;;; Other
 
 (defun pocket-reader-delete ()
-  "Delete current item (with confirmation)."
+  "Delete current or marked items (with confirmation)."
   (interactive)
   (when (yes-or-no-p "Delete item(s)?")
-    (pocket-reader--with-marked-or-current-items
-     (pocket-reader--delete-item (tabulated-list-get-id)))))
+    (apply #'pocket-reader--delete-items (pocket-reader--marked-or-current-items))))
 
 (defun pocket-reader-toggle-favorite ()
   "Toggle current item's favorite status."
   (interactive)
-  (pocket-reader--with-marked-or-current-items
+  (pocket-reader--at-marked-or-current-items
    (let ((action (if (string-empty-p (elt (tabulated-list-get-entry) 1))
                      ;; Not favorited; add it
                      'favorite
@@ -466,7 +466,7 @@ REGEXP REGEXP ...)."
 (defun pocket-reader-toggle-archived ()
   "Toggle current item's archived/unread status."
   (interactive)
-  (pocket-reader--with-marked-or-current-items
+  (pocket-reader--at-marked-or-current-items
    (let* ((action (pcase (pocket-reader--get-property :status)
                     ;; Unread; archive
                     ("0" 'archive)
@@ -495,14 +495,20 @@ REGEXP REGEXP ...)."
   (tabulated-list-revert)
   (pocket-reader--finalize))
 
-(defun pocket-reader--delete-item (id)
-  "Delete item by ID."
-  (pocket-reader--at-item id
-    (when (pocket-lib-delete (pocket-reader--current-item))
-      (setq pocket-reader-items (cl-remove id pocket-reader-items
-                                           :test #'string= :key #'car))
-      (setq tabulated-list-entries pocket-reader-items)
-      (tabulated-list-delete-entry))))
+(defun pocket-reader--delete-items (&rest items)
+  "Delete ITEMS.
+Items should be a list of items as returned by
+`pocket-reader--marked-or-current-items'."
+  (when (apply #'pocket-lib-delete items)
+    (cl-loop for item in items
+             for id = (alist-get 'item_id item)
+             do (progn
+                  (pocket-reader--unmark-item id)
+                  (setq pocket-reader-items (cl-remove id pocket-reader-items
+                                                       :test #'string= :key #'car))
+                  (setq tabulated-list-entries pocket-reader-items)
+                  (pocket-reader--at-item id
+                    (tabulated-list-delete-entry))))))
 
 (defun pocket-reader--finalize (&rest ignore)
   "Finalize the buffer after adding or sorting items."
@@ -589,11 +595,17 @@ QUERY is a string which may contain certain keywords:
                                    tags)))))
 
 (defun pocket-reader--action (action &optional arg)
-  "Execute ACTION on current item.
+  "Execute ACTION on marked or current items.
 ACTION should be a string or symbol which is the name of an
 action in the Pocket API."
   (with-pocket-reader
-   (pocket-lib--action action (pocket-reader--current-item))))
+   (apply #'pocket-lib--action action (pocket-reader--marked-or-current-items))))
+
+(defun pocket-reader--marked-or-current-items ()
+  "Return marked items or current items, suitable for pocket-lib."
+  (or (cl-loop for (id . ov) in pocket-reader-mark-overlays
+               collect (list (cons 'item_id id)))
+      (pocket-reader--current-item)))
 
 (defun pocket-reader--set-tags-column ()
   "Set tags column for current entry."
