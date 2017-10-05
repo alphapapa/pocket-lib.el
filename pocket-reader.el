@@ -201,6 +201,16 @@ REGEXP REGEXP ...)."
                        do (setq ,list (delete string ,list))
                        and collect (replace-regexp-in-string (rx-to-string '(seq bos ,prefix)) "" string)))))
 
+(defmacro pocket-reader--with-marked-or-current-items (&rest body)
+  "Execute BODY at each marked item, or current item if none are marked."
+  `(if pocket-reader-mark-overlays
+       ;; Marked items
+       (cl-loop for (id . ov) in pocket-reader-mark-overlays
+                do (pocket-reader--with-item id
+                     ,@body))
+     ;; Current item
+     ,@body))
+
 ;;;; Mode
 
 (define-derived-mode pocket-reader-mode tabulated-list-mode
@@ -272,20 +282,21 @@ REGEXP REGEXP ...)."
 (defun pocket-reader-excerpt ()
   "Show excerpt for current item."
   (interactive)
-  (let ((excerpt (pocket-reader--get-property :excerpt)))
-    (unless (s-blank-str? excerpt)
-      (let* ((start-col (1+ (pocket-reader--column-start "Title")))
-             (prefix (s-repeat start-col " "))
-             (width (- (window-text-width) start-col))
-             (left-margin start-col)
-             (string (concat prefix (s-trim (propertize (pocket-reader--wrap-string excerpt width)
-                                                        'face 'default)) "\n")))
-        (unless (cl-loop for ov in (ov-forwards)
-                         when (equal string (ov-val ov 'before-string))
-                         do (ov-reset ov)
-                         and return t)
-          (ov (1+ (line-end-position)) (1+ (line-end-position))
-              'before-string string))))))
+  (pocket-reader--with-marked-or-current-items
+   (let ((excerpt (pocket-reader--get-property :excerpt)))
+     (unless (s-blank-str? excerpt)
+       (let* ((start-col (1+ (pocket-reader--column-start "Title")))
+              (prefix (s-repeat start-col " "))
+              (width (- (window-text-width) start-col))
+              (left-margin start-col)
+              (string (concat prefix (s-trim (propertize (pocket-reader--wrap-string excerpt width)
+                                                         'face 'default)) "\n")))
+         (unless (cl-loop for ov in (ov-forwards)
+                          when (equal string (ov-val ov 'before-string))
+                          do (ov-reset ov)
+                          and return t)
+           (ov (1+ (line-end-position)) (1+ (line-end-position))
+               'before-string string)))))))
 
 (defun pocket-reader--column-start (column)
   "Return text column that COLUMN starts at on each line."
@@ -358,14 +369,15 @@ REGEXP REGEXP ...)."
                        (s-split " " it 'omit-nulls)
                        (s-join "," it)))
         (old-tags (pocket-reader--get-property :tags)))
-    (when (and new-tags
-               (pocket-lib--tags-action 'tags_add new-tags item))
-      ;; Tags added successfully
-      (pocket-reader--set-entry-property :tags (append (s-split "," new-tags)
-                                                       old-tags))
-      (pocket-reader--set-tags-column)
-      ;; Fix face
-      (pocket-reader--apply-faces-to-line))))
+    (pocket-reader--with-marked-or-current-items
+     (when (and new-tags
+                (pocket-lib--tags-action 'tags_add new-tags item))
+       ;; Tags added successfully
+       (pocket-reader--set-entry-property :tags (append (s-split "," new-tags)
+                                                        old-tags))
+       (pocket-reader--set-tags-column)
+       ;; Fix face
+       (pocket-reader--apply-faces-to-line)))))
 
 (defun pocket-reader-remove-tags (remove-tags)
   "Remove tags from current item."
@@ -376,13 +388,14 @@ REGEXP REGEXP ...)."
          (remove-tags-string (s-join "," remove-tags))
          (new-tags (or (seq-difference old-tags remove-tags)
                        '(" "))))
-    (when (and remove-tags
-               (pocket-lib--tags-action 'tags_remove remove-tags-string item))
-      ;; Tags removed successfully
-      (pocket-reader--set-entry-property :tags new-tags)
-      (pocket-reader--set-tags-column)
-      ;; Fix face
-      (pocket-reader--apply-faces-to-line))))
+    (pocket-reader--with-marked-or-current-items
+     (when (and remove-tags
+                (pocket-lib--tags-action 'tags_remove remove-tags-string item))
+       ;; Tags removed successfully
+       (pocket-reader--set-entry-property :tags new-tags)
+       (pocket-reader--set-tags-column)
+       ;; Fix face
+       (pocket-reader--apply-faces-to-line)))))
 
 (defun pocket-reader-set-tags (tags)
   "Set TAGS of current item."
@@ -391,25 +404,27 @@ REGEXP REGEXP ...)."
    (let* ((item (pocket-reader--current-item))
           (tags (s-split " " tags 'omit-nulls))
           (tags-string (s-join "," tags)))
-     (when (pocket-lib--tags-action 'tags_replace tags-string item)
-       ;; Tags replaced successfully
-       (pocket-reader--set-entry-property :tags tags)
-       (pocket-reader--set-tags-column)
-       ;; Fix face
-       (pocket-reader--apply-faces-to-line)))))
+     (pocket-reader--with-marked-or-current-items
+      (when (pocket-lib--tags-action 'tags_replace tags-string item)
+        ;; Tags replaced successfully
+        (pocket-reader--set-entry-property :tags tags)
+        (pocket-reader--set-tags-column)
+        ;; Fix face
+        (pocket-reader--apply-faces-to-line))))))
 
 ;;;;;; URL-opening
 
 (defun pocket-reader-open-url (&optional &key fn)
   "Open URL of current item with default function."
   (interactive)
-  (let* ((url (pocket-reader--get-property :resolved_url))
-         (fn (or fn (pocket-reader--map-url-open-fn url))))
-    (when (funcall fn url)
-      ;; Item opened successfully
-      (when pocket-reader-archive-on-open
-        (with-pocket-reader
-         (pocket-reader-toggle-archived))))))
+  (pocket-reader--with-marked-or-current-items
+   (let* ((url (pocket-reader--get-property :resolved_url))
+          (fn (or fn (pocket-reader--map-url-open-fn url))))
+     (when (funcall fn url)
+       ;; Item opened successfully
+       (when pocket-reader-archive-on-open
+         (with-pocket-reader
+          (pocket-reader-toggle-archived)))))))
 
 (defun pocket-reader-pop-to-url ()
   "Open URL of current item with default pop-to function."
@@ -437,45 +452,48 @@ REGEXP REGEXP ...)."
 (defun pocket-reader-delete ()
   "Delete current item (with confirmation)."
   (interactive)
-  (when (yes-or-no-p "Delete item?")
-    (pocket-reader--delete-item (tabulated-list-get-id))))
+  (when (yes-or-no-p "Delete item(s)?")
+    (pocket-reader--with-marked-or-current-items
+     (pocket-reader--delete-item (tabulated-list-get-id)))))
 
 (defun pocket-reader-toggle-favorite ()
   "Toggle current item's favorite status."
   (interactive)
-  (let ((action (if (string-empty-p (elt (tabulated-list-get-entry) 1))
-                    ;; Not favorited; add it
-                    'favorite
-                  ;; Favorited; remove it
-                  'unfavorite)))
-    (when (pocket-reader--action action)
-      ;; Item successfully toggled
-      (tabulated-list-set-col 1
-                              (cl-case action
-                                (favorite "*")
-                                (unfavorite ""))
-                              t)
-      (pocket-reader--apply-faces-to-line))))
+  (pocket-reader--with-marked-or-current-items
+   (let ((action (if (string-empty-p (elt (tabulated-list-get-entry) 1))
+                     ;; Not favorited; add it
+                     'favorite
+                   ;; Favorited; remove it
+                   'unfavorite)))
+     (when (pocket-reader--action action)
+       ;; Item successfully toggled
+       (tabulated-list-set-col 1
+                               (cl-case action
+                                 (favorite "*")
+                                 (unfavorite ""))
+                               t)
+       (pocket-reader--apply-faces-to-line)))))
 
 (defun pocket-reader-toggle-archived ()
   "Toggle current item's archived/unread status."
   (interactive)
-  (let* ((action (pcase (pocket-reader--get-property :status)
-                   ;; Unread; archive
-                   ("0" 'archive)
-                   ;; Archived; readd
-                   ("1" 'readd)))
-         (face (cl-case action
-                 ('archive 'pocket-reader-archived)
-                 ('readd 'pocket-reader-unread)))
-         (status (cl-case action
-                   ('archive "1")
-                   ('readd "0"))))
-    (when (pocket-reader--action action)
-      ;; Item successfully toggled
-      (with-pocket-reader
-       (pocket-reader--set-entry-property :status status)
-       (pocket-reader--apply-faces-to-line)))))
+  (pocket-reader--with-marked-or-current-items
+   (let* ((action (pcase (pocket-reader--get-property :status)
+                    ;; Unread; archive
+                    ("0" 'archive)
+                    ;; Archived; readd
+                    ("1" 'readd)))
+          (face (cl-case action
+                  ('archive 'pocket-reader-archived)
+                  ('readd 'pocket-reader-unread)))
+          (status (cl-case action
+                    ('archive "1")
+                    ('readd "0"))))
+     (when (pocket-reader--action action)
+       ;; Item successfully toggled
+       (with-pocket-reader
+        (pocket-reader--set-entry-property :status status)
+        (pocket-reader--apply-faces-to-line))))))
 
 ;;;;; Helpers
 
