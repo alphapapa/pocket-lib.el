@@ -285,7 +285,7 @@ REGEXP REGEXP ...)."
   (pocket-reader--with-marked-or-current-items
    (let ((excerpt (pocket-reader--get-property :excerpt)))
      (unless (s-blank-str? excerpt)
-       (let* ((start-col (1+ (pocket-reader--column-start "Title")))
+       (let* ((start-col (1+ (cl-second (pocket-reader--column-data "Title"))))
               (prefix (s-repeat start-col " "))
               (width (- (window-text-width) start-col))
               (left-margin start-col)
@@ -297,20 +297,6 @@ REGEXP REGEXP ...)."
                           and return t)
            (ov (1+ (line-end-position)) (1+ (line-end-position))
                'before-string string)))))))
-
-(defun pocket-reader--column-start (column)
-  "Return text column that COLUMN starts at on each line."
-  (let* ((column-num (cl-typecase column
-                       (integer column)
-                       (string (tabulated-list--column-number column))))
-         (column-data (aref tabulated-list-format column-num))
-         (start-col (1+ (cl-loop for i from 0 below column-num
-                                 for col-data = (aref tabulated-list-format i)
-                                 for col-width = (elt col-data 1)
-                                 sum col-width)))
-         (column-width (elt column-data 1))
-         (end-pos (+ start-col column-width)))
-    start-col))
 
 (defun pocket-reader-excerpt-all ()
   "Show all excerpts."
@@ -329,16 +315,6 @@ REGEXP REGEXP ...)."
         (while (not (eobp))
           (pocket-reader-excerpt)
           (forward-line 1))))))
-
-(defun pocket-reader--wrap-string (string length)
-  "Wrap STRING to LENGTH."
-  (if (> (length string) length)
-      (s-trim (with-temp-buffer
-                (insert string)
-                (let ((fill-column length))
-                  (fill-region-as-paragraph (point-min) (point-max))
-                  (buffer-string))))
-    string))
 
 ;;;;;; Marking
 
@@ -650,32 +626,12 @@ action in the Pocket API."
                         title)
      (tabulated-list-set-col 2 title))))
 
-(defun pocket-reader--not-empty-string (s)
-  "If S is non-empty, return it; otherwise return \" \"."
-  ;; No column may be actually empty, because `tabulated-list-set-col' doesn't work on
-  ;; nil columns, because it uses `next-single-property-change' to find the place to
-  ;; modify.  So we use an empty string instead of nil.
-  (if (string-empty-p s)
-      " "
-    s))
-
-(defun pocket-reader--or-string-not-blank (&rest strings)
-  "Return first non-empty string in STRINGS."
-  (cl-loop for string in strings
-           when (and string (not (s-blank-str? string)))
-           return string))
 
 (defun pocket-reader--url-domain (url)
   "Return domain for URL.
 Common prefixes like www are removed."
   (replace-regexp-in-string (rx bos (and (or "www") ".")) ""
                             (url-host (url-generic-parse-url url))))
-
-(defun pocket-reader--favorite-string (val)
-  "If VAL is 1, return the star character as a string, otherwise the empty string."
-  (pcase val
-    ("0" "")
-    ("1" "*")))
 
 (defun pocket-reader--format-timestamp (timestamp)
   "Format TIMESTAMP."
@@ -715,6 +671,39 @@ This function assumes that the item is not already marked."
     (ov-reset ov))
   (setq pocket-reader-mark-overlays (cl-remove id pocket-reader-mark-overlays :test #'string= :key #'car)))
 
+;;;;;; Strings
+
+(defun pocket-reader--favorite-string (val)
+  "If VAL is 1, return the star character as a string, otherwise the empty string."
+  (pcase val
+    ("0" "")
+    ("1" "*")))
+
+(defun pocket-reader--wrap-string (string length)
+  "Wrap STRING to LENGTH."
+  (if (> (length string) length)
+      (s-trim (with-temp-buffer
+                (insert string)
+                (let ((fill-column length))
+                  (fill-region-as-paragraph (point-min) (point-max))
+                  (buffer-string))))
+    string))
+
+(defun pocket-reader--not-empty-string (s)
+  "If S is non-empty, return it; otherwise return \" \"."
+  ;; No column may be actually empty, because `tabulated-list-set-col' doesn't work on
+  ;; nil columns, because it uses `next-single-property-change' to find the place to
+  ;; modify.  So we use an empty string instead of nil.
+  (if (string-empty-p s)
+      " "
+    s))
+
+(defun pocket-reader--or-string-not-blank (&rest strings)
+  "Return first non-empty string in STRINGS."
+  (cl-loop for string in strings
+           when (and string (not (s-blank-str? string)))
+           return string))
+
 ;;;;;; Faces
 
 (defun pocket-reader--apply-faces ()
@@ -753,19 +742,34 @@ This function assumes that the item is not already marked."
 (defun pocket-reader--set-column-face (column face)
   "Apply FACE to COLUMN on current line.
 COLUMN may be the column name or number."
-  (let* ((column-num (cl-typecase column
-                       (integer column)
-                       (string (tabulated-list--column-number column))))
-         (column-data (aref tabulated-list-format column-num))
-         (start-pos (+ (line-beginning-position)
-                       (1+ (cl-loop for i from 0 below column-num
-                                    for col-data = (aref tabulated-list-format i)
-                                    for col-width = (elt col-data 1)
-                                    sum col-width))))
-         (column-width (elt column-data 1))
-         (end-pos (+ start-pos column-width)))
+  (-let* (((num start end width) (pocket-reader--column-data column))
+          ;; Convert column positions to buffer positions
+          (start (+ (line-beginning-position) start))
+          (end (+ start width)))
     (with-pocket-reader
-     (add-face-text-property start-pos end-pos face t))))
+     (add-face-text-property start end face t))))
+
+(defun pocket-reader--column-data (column)
+  "Return data about COLUMN.
+COLUMN may be a number or the heading string.
+
+Returns list with these values:
+
+- Column number (if COLUMN is a string)
+- Start column (column on each line that COLUMN starts at)
+- End column (column on each line that COLUMN stops at)
+- Column width (in characters)"
+  (let* ((col-num (cl-typecase column
+                    (integer column)
+                    (string (tabulated-list--column-number column))))
+         (col-data (aref tabulated-list-format col-num))
+         (start-col (1+ (cl-loop for i from 0 below col-num
+                                 for col-data = (aref tabulated-list-format i)
+                                 for col-width = (elt col-data 1)
+                                 sum col-width)))
+         (column-width (elt col-data 1))
+         (end-col (+ start-col column-width)))
+    (list col-num start-col end-col column-width)))
 
 ;;;; Footer
 
