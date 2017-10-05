@@ -225,7 +225,7 @@ If ID is an integer, convert it to a string."
   "Toggle status of marked or current items.
 
 TOGGLES should be a cons cell with each item a symbol naming
-opposing actions in the Pocket API, such as (ARCHIVE . READD).
+opposing actions in the Pocket API, such as '(archive . readd).
 
 TEST should be a lisp form to evaluate at each item in the list.
 If non-nil, the item will be added to a list for the first
