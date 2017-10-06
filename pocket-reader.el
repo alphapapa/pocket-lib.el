@@ -689,7 +689,7 @@ the date changes."
 
 (defun pocket-reader--archive-items (&rest items)
   "Mark ITEMS as archived."
-  (when (pocket-lib-archive items)
+  (when (apply #'pocket-lib-archive items)
     (--map (pocket-reader--at-item it
              (pocket-reader--set-property :status "1")
              (pocket-reader--apply-faces-to-line))
@@ -697,7 +697,7 @@ the date changes."
 
 (defun pocket-reader--readd-items (&rest items)
   "Readd ITEMS."
-  (when (pocket-lib-readd items)
+  (when (apply #'pocket-lib-readd items)
     (--map (pocket-reader--at-item it
              (pocket-reader--set-property :status "0")
              (pocket-reader--apply-faces-to-line))
@@ -711,7 +711,7 @@ the date changes."
 
 (defun pocket-reader--favorite-items (&rest items)
   "Mark ITEMS as favorites."
-  (when (pocket-lib-favorite items)
+  (when (apply #'pocket-lib-favorite items)
     (--map (pocket-reader--at-item it
              (pocket-reader--set-property :favorite "1")
              (pocket-reader--update-favorite-display t))
@@ -719,7 +719,7 @@ the date changes."
 
 (defun pocket-reader--unfavorite-items (&rest items)
   "Unmark ITEMS as favorites."
-  (when (pocket-lib-unfavorite items)
+  (when (apply #'pocket-lib-unfavorite items)
     (--map (pocket-reader--at-item it
              (pocket-reader--set-property :favorite "0")
              (pocket-reader--update-favorite-display nil))
