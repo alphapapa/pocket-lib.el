@@ -63,7 +63,7 @@
   :group 'external)
 
 (defcustom pocket-lib-consumer-key "30410-da1b34ce81aec5843a2214f4"
-  "API consumer key"
+  "API consumer key."
   :type 'string)
 
 (defcustom pocket-lib-token-file (expand-file-name "~/.cache/emacs-pocket-lib-token.json")
@@ -287,7 +287,7 @@ TAGS may be a list of strings or nil."
   (apply #'pocket-lib--action 'unfavorite items))
 
 (defun pocket-lib--tags-action (action tags &rest items)
-  "Execute tag ACTION on ITEMS with TAGS."
+  "Execute tag ACTION with TAGS on ITEMS."
   (let ((action (cl-typecase action
                   (string action)
                   (symbol (symbol-name action)))))
