@@ -632,9 +632,8 @@ none is found, returns `pocket-reader-open-url-default-function'."
 
 (defun pocket-reader--current-item ()
   "Return list containing cons of current item's ID, suitable for passing to pocket-lib."
-  (let* ((id (string-to-number (tabulated-list-get-id)))
-         (item (list (cons 'item_id id))))
-    item))
+  (let* ((id (string-to-number (tabulated-list-get-id))))
+    (list (cons 'item_id id))))
 
 (defun pocket-reader--get-property (property)
   "Return value of PROPERTY for current item."
