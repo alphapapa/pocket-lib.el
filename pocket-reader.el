@@ -266,7 +266,10 @@ alist, get the `item-id' from it."
   (setq pocket-reader-offset 0
         pocket-reader-query query
         pocket-reader-items nil)
-  (pocket-reader--add-items (pocket-reader--get-items query)))
+  (let ((items (pocket-reader--get-items query)))
+    (pocket-reader--add-items items)
+    (unless items
+      (message "No items for query: %s" query))))
 
 (defun pocket-reader-show-unread-favorites ()
   "Show unread favorite items."
