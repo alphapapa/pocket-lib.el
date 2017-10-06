@@ -380,8 +380,8 @@ alist, get the `item-id' from it."
   (let* ((new-tags (s-split (rx (or space ",")) tags 'omit-nulls))
          (new-tags-string (s-join "," new-tags)))
     (when (and new-tags-string
-               (pocket-lib--tags-action 'tags_add new-tags-string
-                                        (pocket-reader--marked-or-current-items)))
+               (apply #'pocket-lib--tags-action 'tags_add new-tags-string
+                      (pocket-reader--marked-or-current-items)))
       ;; Tags added successfully
       (pocket-reader--at-marked-or-current-items
         (pocket-reader--add-tags new-tags)))))
@@ -393,8 +393,8 @@ alist, get the `item-id' from it."
   (let* ((remove-tags (s-split (rx (or space ",")) remove-tags 'omit-nulls))
          (remove-tags-string (s-join "," remove-tags)))
     (when (and remove-tags-string
-               (pocket-lib--tags-action 'tags_remove remove-tags-string
-                                        (pocket-reader--marked-or-current-items)))
+               (apply #'pocket-lib--tags-action 'tags_remove remove-tags-string
+                      (pocket-reader--marked-or-current-items)))
       ;; Tags removed successfully
       (pocket-reader--at-marked-or-current-items
         (pocket-reader--remove-tags remove-tags)))))
@@ -405,7 +405,7 @@ alist, get the `item-id' from it."
   (with-pocket-reader
    (let* ((tags (s-split (rx (or space ",")) tags 'omit-nulls))
           (tags-string (s-join "," tags)))
-     (when (pocket-lib--tags-action 'tags_replace tags-string (pocket-reader--marked-or-current-items))
+     (when (apply #'pocket-lib--tags-action 'tags_replace tags-string (pocket-reader--marked-or-current-items))
        ;; Tags replaced successfully
        (pocket-reader--at-marked-or-current-items
          (pocket-reader--set-tags tags))))))
