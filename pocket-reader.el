@@ -482,7 +482,7 @@ alist, get the `item-id' from it."
 (defun pocket-reader--add-items (items)
   "Add and display ITEMS."
   (setq pocket-reader-items (append pocket-reader-items items))
-  (pocket-reader--set-tabulated-settings)
+  (pocket-reader--set-tabulated-list-format)
   (setq tabulated-list-entries pocket-reader-items)
   (tabulated-list-init-header)
   (tabulated-list-revert)
@@ -607,7 +607,8 @@ action in the Pocket API."
 Gets tags from text property."
   (tabulated-list-set-col 4 (s-join "," (pocket-reader--get-property :tags))))
 
-(defun pocket-reader--set-tabulated-settings ()
+(defun pocket-reader--set-tabulated-list-format ()
+  "Set `tabulated-list-format' according to the maximum width of items about to be displayed."
   (let* ((site-width (cl-loop for item in pocket-reader-items
                               maximizing (length (elt (cadr item) 3))))
          (title-width (- (window-text-width) 11 2 site-width 10 1)))
