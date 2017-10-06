@@ -223,39 +223,6 @@ alist, get the `item-id' from it."
      ;; Current item
      ,@body))
 
-(cl-defmacro pocket-reader--toggle (toggles &key test at-item)
-  "Toggle status of marked or current items.
-
-TOGGLES should be a cons cell with each item a symbol naming
-opposing actions in the Pocket API, such as '(archive . readd).
-
-TEST should be a lisp form to evaluate at each item in the list.
-If non-nil, the item will be added to a list for the first
-action, otherwise for the second.
-
-AT-ITEM should be a lisp form which will be run at each item
-after the actions are completed (e.g. this can be used to update
-a column in the list)."
-  (declare (indent defun) (debug (consp ":test" form ":at-item" form)))
-  `(let ((actions (cons nil nil)))
-     ;; Add items to list of toggle actions
-     (cl-loop for item in (pocket-reader--marked-or-current-items)
-              for id = (number-to-string (alist-get 'item_id item))
-              do (pocket-reader--at-item id
-                   (if ,test
-                       (push item (car actions))
-                     (push item (cdr actions)))))
-     ;; Process actions
-     ;; FIXME: `symbol-value' doesn't work with lexical binding?  So I
-     ;; have to make this list myself?  Weird...
-     (cl-loop for (action . items) in (list (cons (car ,toggles) (car actions))
-                                            (cons (cdr ,toggles) (cdr actions)))
-              when (and items (apply #'pocket-lib--action action items))
-              do (cl-loop for item in items
-                          for id = (number-to-string (alist-get 'item_id item))
-                          do (pocket-reader--at-item id
-                               ,at-item)))))
-
 ;;;; Mode
 
 (define-derived-mode pocket-reader-mode tabulated-list-mode
