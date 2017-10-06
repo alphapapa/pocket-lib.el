@@ -175,7 +175,7 @@ REGEXP REGEXP ...)."
 ;;;; Macros
 
 (defmacro with-pocket-reader (&rest body)
-  "Run BODY in pocket-reader buffer."
+  "Run BODY in pocket-reader buffer and read-only inhibited."
   `(with-current-buffer "*pocket-reader*"
      (let ((inhibit-read-only t))
        ,@body)))
@@ -189,7 +189,7 @@ REGEXP REGEXP ...)."
                        and collect (s-replace (rx ":") "" keyword)))))
 
 (cl-defmacro pocket-reader--regexp-in-list (list regexp &optional (prefix ":"))
-  "If REGEXP matches strings in LIST, destructively remove strings from LIST and return the last string without PREFIX."
+  "If REGEXP matches strings in LIST, destructively remove strings from LIST and return the last matching string without PREFIX."
   `(car (last (cl-loop for string in ,list
                        when (string-match ,regexp string)
                        do (setq ,list (delete string ,list))
@@ -294,7 +294,7 @@ alist, get the `item-id' from it."
     (ov-clear 'display "")))
 
 (defun pocket-reader-excerpt ()
-  "Show excerpt for current item."
+  "Show excerpt for marked or current items."
   (interactive)
   (pocket-reader--at-marked-or-current-items
    (let ((excerpt (pocket-reader--get-property :excerpt)))
@@ -305,10 +305,12 @@ alist, get the `item-id' from it."
               (left-margin start-col)
               (string (concat prefix (s-trim (propertize (pocket-reader--wrap-string excerpt width)
                                                          'face 'default)) "\n")))
+         ;; Hide or show excerpt
          (unless (cl-loop for ov in (ov-forwards)
                           when (equal string (ov-val ov 'before-string))
                           do (ov-reset ov)
                           and return t)
+           ;; Excerpt not found; show it
            (ov (1+ (line-end-position)) (1+ (line-end-position))
                'before-string string)))))))
 
@@ -503,7 +505,10 @@ Items should be a list of items as returned by
 
 (defun pocket-reader--finalize (&rest ignore)
   "Finalize the buffer after adding or sorting items."
-  ;; Make sure it's the pocket-reader buffer.
+  ;; Because we have to add this function as advice to
+  ;; `tabulated-list--sort-by-column-name', causing it to run in every
+  ;; tabulated-list buffer, we must make sure it's the pocket-reader
+  ;; buffer.
   (when (string= "*pocket-reader*" (buffer-name))
     (run-hooks 'pocket-reader-finalize-hook)))
 
@@ -539,6 +544,7 @@ QUERY is a string which may contain certain keywords:
 
   ;; FIXME: Add error handling.
   (let* ((query (or query ""))
+         ;; Parse query
          (query-words (s-split " " query))
          (state (pocket-reader--keywords-in-list query-words ":archive" ":all" ":unread"))
          (favorite (when (pocket-reader--keywords-in-list query-words ":favorite" ":*") 1))
@@ -548,14 +554,10 @@ QUERY is a string which may contain certain keywords:
                           pocket-reader-show-count)))
          (tag (pocket-reader--regexp-in-list query-words (rx bos ":t:" (1+ word) eos) ":t:"))
          (query-string (s-join " " query-words))
-         (items (cdr (cl-third (pocket-lib-get
-                                 :detail-type "complete"
-                                 :count count
-                                 :offset pocket-reader-offset
-                                 :search query-string
-                                 :state state
-                                 :favorite favorite
-                                 :tag tag))))
+         ;; Get items with query
+         (items (cdr (cl-third (pocket-lib-get :detail-type "complete" :count count :offset pocket-reader-offset
+                                 :search query-string :state state :favorite favorite :tag tag))))
+         ;; Convert list of alists to plists with selected keys
          (item-plists (--map (cl-loop with item = (kvalist->plist (cdr it))
                                       for key in pocket-reader-keys
                                       for fn = nil
@@ -568,6 +570,7 @@ QUERY is a string which may contain certain keywords:
                                       when val
                                       append (list key val))
                              items)))
+    ;; Collect data from plists and return as list of vectors for tabulated-list
     (cl-loop for it in item-plists
              for title = (pocket-reader--not-empty-string (apply #'propertize (pocket-reader--or-string-not-blank
                                                                                (plist-get it :resolved_title)
@@ -589,17 +592,19 @@ QUERY is a string which may contain certain keywords:
   "Execute ACTION on marked or current items.
 ACTION should be a string or symbol which is the name of an
 action in the Pocket API."
+  ;; MAYBE: Not currently using this, may not need it.
   (with-pocket-reader
    (apply #'pocket-lib--action action (pocket-reader--marked-or-current-items))))
 
 (defun pocket-reader--marked-or-current-items ()
-  "Return marked or current items, suitable for pocket-lib."
+  "Return marked or current items, suitable for passing to `pocket-lib' functions."
   (or (cl-loop for (id . ov) in pocket-reader-mark-overlays
                collect (list (cons 'item_id (string-to-number id))))
       (list (pocket-reader--current-item))))
 
 (defun pocket-reader--set-tags-column ()
-  "Set tags column for current entry."
+  "Set tags column for current entry.
+Gets tags from text property."
   (tabulated-list-set-col 4 (s-join "," (pocket-reader--get-property :tags))))
 
 (defun pocket-reader--set-tabulated-settings ()
@@ -613,7 +618,9 @@ action in the Pocket API."
                                         (list "Tags" 10 t)))))
 
 (defun pocket-reader--map-url-open-fn (url)
-  "Return function to use to open URL."
+  "Return function to use to open URL.
+Checks `pocket-reader-url-open-fn-map' for a function to use.  If
+none is found, returns `pocket-reader-open-url-default-function'."
   (or (car (cl-rassoc url pocket-reader-url-open-fn-map
                       :test (lambda (url regexp)
                               (string-match (rx-to-string `(seq "http" (optional "s") "://"
@@ -642,7 +649,6 @@ action in the Pocket API."
                         title)
      (tabulated-list-set-col 2 title))))
 
-
 (defun pocket-reader--url-domain (url)
   "Return domain for URL.
 Common prefixes like www are removed."
@@ -655,10 +661,12 @@ Common prefixes like www are removed."
 
 (defun pocket-reader--add-spacers (&rest ignore)
   "Insert overlay spacers where the current sort column's values change.
-For example, if sorted by date, a spacer will be inserted where the date changes."
+For example, if sorted by date, a spacer will be inserted where
+the date changes."
   (let ((sort-column (seq-position tabulated-list-format tabulated-list-sort-key
                                    (lambda (seq elt)
                                      (string= (car seq) (car elt))))))
+    ;; Clear existing spacers
     (ov-clear)
     (save-excursion
       (goto-char (point-min))
