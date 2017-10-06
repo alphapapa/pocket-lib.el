@@ -319,15 +319,21 @@ alist, get the `item-id' from it."
   (interactive)
   (save-excursion
     (goto-char (point-min))
-    ;; FIXME: This won't work if the first item has no excerpt
-    (let ((first-excerpt (pocket-reader--get-property :excerpt)))
+    (let ((first-excerpt (cl-loop while (not (eobp))
+                                  for excerpt = (pocket-reader--get-property :excerpt)
+                                  when excerpt
+                                  return excerpt
+                                  finally do (error "No excerpts found"))))
+      ;; Search for overlay showing this excerpt
       (if (cl-loop for ov in (ov-forwards)
                    thereis (equal (ov-val ov 'before-string) first-excerpt))
-          ;; Already shown; hide all
-          (cl-loop for ov in (ov-forwards)
+          ;; Already shown; hide all excerpts
+          (cl-loop initially do (goto-char (point-min))
+                   for ov in (ov-forwards)
                    when (not (equal (ov-val ov 'before-string) "\n"))
                    do (ov-reset ov))
-        ;; Show all
+        ;; Not shown; show all excerpts
+        (goto-char (point-min))
         (while (not (eobp))
           (pocket-reader-excerpt)
           (forward-line 1))))))
