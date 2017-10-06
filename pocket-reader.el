@@ -216,6 +216,7 @@ alist, get the `item-id' from it."
 
 (defmacro pocket-reader--at-marked-or-current-items (&rest body)
   "Execute BODY at each marked item, or current item if none are marked."
+  (declare (indent defun))
   `(if pocket-reader-mark-overlays
        ;; Marked items
        (cl-loop for (id . ov) in pocket-reader-mark-overlays
@@ -297,22 +298,22 @@ alist, get the `item-id' from it."
   "Show excerpt for marked or current items."
   (interactive)
   (pocket-reader--at-marked-or-current-items
-   (let ((excerpt (pocket-reader--get-property :excerpt)))
-     (unless (s-blank-str? excerpt)
-       (let* ((start-col (1+ (cl-second (pocket-reader--column-data "Title"))))
-              (prefix (s-repeat start-col " "))
-              (width (- (window-text-width) start-col))
-              (left-margin start-col)
-              (string (concat prefix (s-trim (propertize (pocket-reader--wrap-string excerpt width)
-                                                         'face 'default)) "\n")))
-         ;; Hide or show excerpt
-         (unless (cl-loop for ov in (ov-forwards)
-                          when (equal string (ov-val ov 'before-string))
-                          do (ov-reset ov)
-                          and return t)
-           ;; Excerpt not found; show it
-           (ov (1+ (line-end-position)) (1+ (line-end-position))
-               'before-string string)))))))
+    (let ((excerpt (pocket-reader--get-property :excerpt)))
+      (unless (s-blank-str? excerpt)
+        (let* ((start-col (1+ (cl-second (pocket-reader--column-data "Title"))))
+               (prefix (s-repeat start-col " "))
+               (width (- (window-text-width) start-col))
+               (left-margin start-col)
+               (string (concat prefix (s-trim (propertize (pocket-reader--wrap-string excerpt width)
+                                                          'face 'default)) "\n")))
+          ;; Hide or show excerpt
+          (unless (cl-loop for ov in (ov-forwards)
+                           when (equal string (ov-val ov 'before-string))
+                           do (ov-reset ov)
+                           and return t)
+            ;; Excerpt not found; show it
+            (ov (1+ (line-end-position)) (1+ (line-end-position))
+                'before-string string)))))))
 
 (defun pocket-reader-excerpt-all ()
   "Show all excerpts."
@@ -370,7 +371,7 @@ alist, get the `item-id' from it."
                                         (pocket-reader--marked-or-current-items)))
       ;; Tags added successfully
       (pocket-reader--at-marked-or-current-items
-       (pocket-reader--add-tags new-tags)))))
+        (pocket-reader--add-tags new-tags)))))
 
 (defun pocket-reader-remove-tags (remove-tags)
   "Remove tags from current item."
@@ -383,7 +384,7 @@ alist, get the `item-id' from it."
                                         (pocket-reader--marked-or-current-items)))
       ;; Tags removed successfully
       (pocket-reader--at-marked-or-current-items
-       (pocket-reader--remove-tags remove-tags)))))
+        (pocket-reader--remove-tags remove-tags)))))
 
 (defun pocket-reader-set-tags (tags)
   "Set TAGS of current item."
@@ -394,7 +395,7 @@ alist, get the `item-id' from it."
      (when (pocket-lib--tags-action 'tags_replace tags-string (pocket-reader--marked-or-current-items))
        ;; Tags replaced successfully
        (pocket-reader--at-marked-or-current-items
-        (pocket-reader--set-tags tags))))))
+         (pocket-reader--set-tags tags))))))
 
 ;;;;;; URL-opening
 
@@ -402,13 +403,13 @@ alist, get the `item-id' from it."
   "Open URL of current item with default function."
   (interactive)
   (pocket-reader--at-marked-or-current-items
-   (let* ((url (pocket-reader--get-property :resolved_url))
-          (fn (or fn (pocket-reader--map-url-open-fn url))))
-     (when (funcall fn url)
-       ;; Item opened successfully
-       (when pocket-reader-archive-on-open
-         (with-pocket-reader
-          (pocket-reader-toggle-archived)))))))
+    (let* ((url (pocket-reader--get-property :resolved_url))
+           (fn (or fn (pocket-reader--map-url-open-fn url))))
+      (when (funcall fn url)
+        ;; Item opened successfully
+        (when pocket-reader-archive-on-open
+          (with-pocket-reader
+           (pocket-reader-toggle-archived)))))))
 
 (defun pocket-reader-pop-to-url ()
   "Open URL of current item with default pop-to function."
