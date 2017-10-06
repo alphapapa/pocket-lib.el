@@ -361,11 +361,10 @@ alist, get the `item-id' from it."
   (with-pocket-reader
    (save-excursion
      (goto-char (point-min))
-     ;; FIXME: This is slow.
      (cl-loop while (not (eobp))
               when (pocket-reader--item-visible-p)
               do (pocket-reader--mark-current-item)
-              do (next-line 1)))))
+              do (forward-line 1)))))
 
 (defun pocket-reader-unmark-all ()
   "Unmark all items."
