@@ -754,13 +754,13 @@ the date changes."
 
 (defun pocket-reader--wrap-string (string length)
   "Wrap STRING to LENGTH."
-  (if (> (length string) length)
-      (s-trim (with-temp-buffer
-                (insert string)
-                (let ((fill-column length))
-                  (fill-region-as-paragraph (point-min) (point-max))
-                  (buffer-string))))
-    string))
+  (if (<= (length string) length)
+      string
+    (s-trim (with-temp-buffer
+              (insert string)
+              (let ((fill-column length))
+                (fill-region-as-paragraph (point-min) (point-max))
+                (buffer-string))))))
 
 (defun pocket-reader--not-empty-string (s)
   "If S is non-empty, return it; otherwise return \" \"."
