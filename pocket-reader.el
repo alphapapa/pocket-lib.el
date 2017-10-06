@@ -64,7 +64,8 @@
                     "s" pocket-reader-search
                     "m" pocket-reader-toggle-mark
                     "U" pocket-reader-unmark-all
-                    "M" pocket-reader-more
+                    "M" pocket-reader-mark-all
+                    "o" pocket-reader-more
                     "l" pocket-reader-limit
                     "tt" pocket-reader-add-tags
                     "ta" pocket-reader-add-tags
@@ -344,14 +345,27 @@ alist, get the `item-id' from it."
 (defun pocket-reader-toggle-mark ()
   "Toggle mark on current item."
   (interactive)
-  (let ((id (tabulated-list-get-id)))
-    (if (cl-member id pocket-reader-mark-overlays
-                   :test #'string= :key #'car)
-        ;; Marked; unmark
-        (pocket-reader--unmark-item id)
-      ;; Unmarked; mark
-      (pocket-reader--mark-current-item))
-    (forward-line 1)))
+  ;; Make sure item is visible
+  (unless (pocket-reader--item-visible-p)
+    (error "toggle-mark called on invisible item: %s" (tabulated-list-get-id)))
+  (if (pocket-reader--item-marked-p)
+      ;; Marked; unmark
+      (pocket-reader--unmark-item (tabulated-list-get-id))
+    ;; Unmarked; mark
+    (pocket-reader--mark-current-item))
+  (next-line 1))
+
+(defun pocket-reader-mark-all ()
+  "Mark all visible items."
+  (interactive)
+  (with-pocket-reader
+   (save-excursion
+     (goto-char (point-min))
+     ;; FIXME: This is slow.
+     (cl-loop while (not (eobp))
+              when (pocket-reader--item-visible-p)
+              do (pocket-reader--mark-current-item)
+              do (next-line 1)))))
 
 (defun pocket-reader-unmark-all ()
   "Unmark all items."
@@ -467,6 +481,11 @@ alist, get the `item-id' from it."
                         (apply #'pocket-reader--archive-items archives))))
 
 ;;;;; Helpers
+
+(defun pocket-reader--item-visible-p ()
+  "Return non-nil if current item is visible (i.e. not hidden by an overlay)."
+  (cl-loop for ov in (overlays-at (line-beginning-position))
+           never (string= "" (ov-val ov 'display))))
 
 (defun pocket-reader--add-items (items)
   "Add and display ITEMS."
@@ -746,16 +765,22 @@ Gets tags from text property."
 
 (defun pocket-reader--mark-current-item ()
   "Mark current item."
-  (let* ((id (tabulated-list-get-id))
-         (cons (cons id (ov (line-beginning-position) (line-end-position)
-                            'face 'pocket-reader-marked))))
-    (push cons pocket-reader-mark-overlays)))
+  (unless (pocket-reader--item-marked-p)
+    (push (cons (tabulated-list-get-id) (ov (line-beginning-position) (line-end-position)
+                                            'face 'pocket-reader-marked))
+          pocket-reader-mark-overlays)))
 
 (defun pocket-reader--unmark-item (id)
   "Unmark item by ID."
   (let ((ov (alist-get id pocket-reader-mark-overlays)))
     (ov-reset ov))
   (setq pocket-reader-mark-overlays (cl-remove id pocket-reader-mark-overlays :test #'string= :key #'car)))
+
+(defun pocket-reader--item-marked-p ()
+  "Return non-nil if current item is marked."
+  (let ((id (tabulated-list-get-id)))
+    (cl-member id pocket-reader-mark-overlays
+               :test #'string= :key #'car)))
 
 ;;;;;; Strings
 
