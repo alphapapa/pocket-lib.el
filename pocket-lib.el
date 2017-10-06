@@ -34,7 +34,6 @@
 ;; `pocket-lib-default-extra-headers' a few lines in the call to
 ;; `request', and the consumer-key is currently the same.
 
-
 ;;; Code:
 
 ;;;; Requirements
