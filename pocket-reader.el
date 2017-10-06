@@ -611,9 +611,9 @@ action in the Pocket API."
 
 (defun pocket-reader--set-tabulated-list-format ()
   "Set `tabulated-list-format' according to the maximum width of items about to be displayed."
-  (let* ((site-width (cl-loop for item in pocket-reader-items
-                              maximizing (length (elt (cadr item) 3))))
-         (title-width (- (window-text-width) 11 2 site-width 10 1)))
+  (when-let ((site-width (cl-loop for item in pocket-reader-items
+                                  maximizing (length (elt (cadr item) 3))))
+             (title-width (- (window-text-width) 11 2 site-width 10 1)))
     (setq tabulated-list-format (vector (list "Added" 10 t)
                                         (list "*" 1 t)
                                         (list "Title" title-width t)
