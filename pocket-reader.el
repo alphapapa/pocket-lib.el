@@ -175,8 +175,9 @@ REGEXP REGEXP ...)."
 
 ;;;; Macros
 
-(defmacro with-pocket-reader (&rest body)
+(defmacro pocket-reader--with-pocket-reader-buffer (&rest body)
   "Run BODY in pocket-reader buffer and read-only inhibited."
+  (declare (indent defun))
   `(with-current-buffer "*pocket-reader*"
      (let ((inhibit-read-only t))
        ,@body)))
@@ -201,19 +202,19 @@ REGEXP REGEXP ...)."
 If ID-OR-ITEM is an integer, convert it to a string.  If it's an
 alist, get the `item-id' from it."
   (declare (indent defun) (debug (symbolp body)))
-  `(with-pocket-reader
-    (let ((id (cl-typecase ,id-or-item
-                (list (number-to-string (alist-get 'item_id ,id-or-item)))
-                (integer (number-to-string ,id-or-item))
-                (string ,id-or-item))))
-      (save-excursion
-        (goto-char (point-min))
-        (cl-loop while (not (eobp))
-                 when (equal (tabulated-list-get-id) id)
-                 return (progn
-                          ,@body)
-                 do (forward-line 1)
-                 finally do (error "Item ID not found: %s" id))))))
+  `(pocket-reader--with-pocket-reader-buffer
+     (let ((id (cl-typecase ,id-or-item
+                 (list (number-to-string (alist-get 'item_id ,id-or-item)))
+                 (integer (number-to-string ,id-or-item))
+                 (string ,id-or-item))))
+       (save-excursion
+         (goto-char (point-min))
+         (cl-loop while (not (eobp))
+                  when (equal (tabulated-list-get-id) id)
+                  return (progn
+                           ,@body)
+                  do (forward-line 1)
+                  finally do (error "Item ID not found: %s" id))))))
 
 (defmacro pocket-reader--at-marked-or-current-items (&rest body)
   "Execute BODY at each marked item, or current item if none are marked."
@@ -361,13 +362,13 @@ alist, get the `item-id' from it."
 (defun pocket-reader-mark-all ()
   "Mark all visible items."
   (interactive)
-  (with-pocket-reader
-   (save-excursion
-     (goto-char (point-min))
-     (cl-loop while (not (eobp))
-              when (pocket-reader--item-visible-p)
-              do (pocket-reader--mark-current-item)
-              do (forward-line 1)))))
+  (pocket-reader--with-pocket-reader-buffer
+    (save-excursion
+      (goto-char (point-min))
+      (cl-loop while (not (eobp))
+               when (pocket-reader--item-visible-p)
+               do (pocket-reader--mark-current-item)
+               do (forward-line 1)))))
 
 (defun pocket-reader-unmark-all ()
   "Unmark all items."
@@ -405,13 +406,13 @@ alist, get the `item-id' from it."
 (defun pocket-reader-set-tags (tags)
   "Set TAGS of current item."
   (interactive (list (read-from-minibuffer "Tags: ")))
-  (with-pocket-reader
-   (let* ((tags (s-split (rx (or space ",")) tags 'omit-nulls))
-          (tags-string (s-join "," tags)))
-     (when (apply #'pocket-lib--tags-action 'tags_replace tags-string (pocket-reader--marked-or-current-items))
-       ;; Tags replaced successfully
-       (pocket-reader--at-marked-or-current-items
-         (pocket-reader--set-tags tags))))))
+  (pocket-reader--with-pocket-reader-buffer
+    (let* ((tags (s-split (rx (or space ",")) tags 'omit-nulls))
+           (tags-string (s-join "," tags)))
+      (when (apply #'pocket-lib--tags-action 'tags_replace tags-string (pocket-reader--marked-or-current-items))
+        ;; Tags replaced successfully
+        (pocket-reader--at-marked-or-current-items
+          (pocket-reader--set-tags tags))))))
 
 ;;;;;; URL-opening
 
@@ -424,8 +425,8 @@ alist, get the `item-id' from it."
       (when (funcall fn url)
         ;; Item opened successfully
         (when pocket-reader-archive-on-open
-          (with-pocket-reader
-           (pocket-reader-toggle-archived)))))))
+          (pocket-reader--with-pocket-reader-buffer
+            (pocket-reader-toggle-archived)))))))
 
 (defun pocket-reader-pop-to-url ()
   "Open URL of current item with default pop-to function."
@@ -603,8 +604,8 @@ QUERY is a string which may contain certain keywords:
 ACTION should be a string or symbol which is the name of an
 action in the Pocket API."
   ;; MAYBE: Not currently using this, may not need it.
-  (with-pocket-reader
-   (apply #'pocket-lib--action action (pocket-reader--marked-or-current-items))))
+  (pocket-reader--with-pocket-reader-buffer
+    (apply #'pocket-lib--action action (pocket-reader--marked-or-current-items))))
 
 (defun pocket-reader--marked-or-current-items ()
   "Return marked or current items, suitable for passing to `pocket-lib' functions."
@@ -647,12 +648,12 @@ none is found, returns `pocket-reader-open-url-default-function'."
 (defun pocket-reader--set-property (property value)
   "Set current item's PROPERTY to VALUE."
   ;; Properties are stored in the title column
-  (with-pocket-reader
-   (let ((title (elt (tabulated-list-get-entry) 2)))
-     (put-text-property 0 (length title)
-                        property value
-                        title)
-     (tabulated-list-set-col 2 title))))
+  (pocket-reader--with-pocket-reader-buffer
+    (let ((title (elt (tabulated-list-get-entry) 2)))
+      (put-text-property 0 (length title)
+                         property value
+                         title)
+      (tabulated-list-set-col 2 title))))
 
 (defun pocket-reader--url-domain (url)
   "Return domain for URL.
@@ -821,25 +822,25 @@ Gets tags from text property."
 
 (defun pocket-reader--apply-faces ()
   ;; TODO: Maybe we should use a custom print function but this is simpler
-  (with-pocket-reader
-   (goto-char (point-min))
-   (while (not (eobp))
-     (pocket-reader--apply-faces-to-line)
-     (forward-line 1))
-   (goto-char (point-min))))
+  (pocket-reader--with-pocket-reader-buffer
+    (goto-char (point-min))
+    (while (not (eobp))
+      (pocket-reader--apply-faces-to-line)
+      (forward-line 1))
+    (goto-char (point-min))))
 
 (defun pocket-reader--apply-faces-to-line ()
   "Apply faces to current line."
-  (with-pocket-reader
-   (add-text-properties (line-beginning-position) (line-end-position)
-                        (list 'face (pcase (pocket-reader--get-property :status)
-                                      ("0" 'pocket-reader-unread)
-                                      ("1" 'pocket-reader-archived)) ))
-   (when (pocket-reader--get-property :favorite)
-     (pocket-reader--set-column-face "*" 'pocket-reader-favorite-star))
-   (when (or pocket-reader-color-site
-             pocket-reader-color-title)
-     (pocket-reader--set-site-face))))
+  (pocket-reader--with-pocket-reader-buffer
+    (add-text-properties (line-beginning-position) (line-end-position)
+                         (list 'face (pcase (pocket-reader--get-property :status)
+                                       ("0" 'pocket-reader-unread)
+                                       ("1" 'pocket-reader-archived)) ))
+    (when (pocket-reader--get-property :favorite)
+      (pocket-reader--set-column-face "*" 'pocket-reader-favorite-star))
+    (when (or pocket-reader-color-site
+              pocket-reader-color-title)
+      (pocket-reader--set-site-face))))
 
 (defun pocket-reader--set-site-face ()
   "Apply colored face to site column for current entry."
@@ -859,8 +860,8 @@ COLUMN may be the column name or number."
           ;; Convert column positions to buffer positions
           (start (+ (line-beginning-position) start))
           (end (+ start width)))
-    (with-pocket-reader
-     (add-face-text-property start end face t))))
+    (pocket-reader--with-pocket-reader-buffer
+      (add-face-text-property start end face t))))
 
 (defun pocket-reader--column-data (column)
   "Return data about COLUMN.
