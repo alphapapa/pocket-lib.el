@@ -1,10 +1,16 @@
 * pocket-lib.el
 
-This is a simple library for accessing the [[https://getpocket.com/developer/docs/v3/][getpocket.com API]].  It is in alpha status at the moment, only supporting =get= and =archive= functions.
+This is a simple library for accessing the [[https://getpocket.com/developer/docs/v3/][getpocket.com API]].  It should be considered in late alpha/early beta status at the moment: there are no known bugs, and some features may still be added.  The API is not expected to change significantly, but backward-incompatible changes might still be made (although this is unlikely).
 
 * Installation
 
-Until this is on MELPA, put =pocket-lib.el= in your =load-path=.
+** MELPA
+
+Just install the =pocket-lib= package.  :)
+
+** Manual
+
+Put =pocket-lib.el= in your =load-path=.
 
 * Usage
 
@@ -21,13 +27,31 @@ Now you can use the library.
 
 ** Functions
 
-+  =pocket-lib-get=  Get items on the reading list.  Call with keyword arguments, as listed in the API docs, to get different kinds of items (e.g. archived, favorited, tagged).
-+  =pocket-lib-archive=  Archive one or more items.  Call with items retrieved with =pocket-lib-get=.
+For more detailed information on each function, use =describe-function=.
+
++  =pocket-lib-get=  Get items on the reading list.  Call with keyword arguments, as listed in the API docs, to get different kinds of items (e.g. archived, favorited, tagged, etc).
++  =pocket-lib-add-urls=  Add one or more URLs to reading list.
+
+These functions operate on one or more items, which should be alists, structured like items retrieved with =pocket-lib-get=, having at least the =item_id= property.
+
++  =pocket-lib-archive=  Archive items.
++  =pocket-lib-readd=  Re-add items to reading list (not a new URL).
++  =pocket-lib-delete=  Delete items from reading list.
++  =pocket-lib-favorite=  Mark items as a favorite.
++  =pocket-lib-unfavorite=  Unmark items as a favorite.
+
++  =pocket-lib--tags-action=  Execute /ACTION/ with /TAGS/ on /ITEMS/.  /ACTION/ should be a tags action from the API.  (Specific tags actions may be added separately in the future, in which case this function would be considered private, so it will remain named with a double-hyphen.)
++  =pocket-lib--process-tags=  Return simple list of strings for /TAGS/ structure as returned by Pocket API.  The Pocket API returns items' tags in a peculiar structure.  This function turns that structure into a simple list of tags.  This is probably useful for users of this library, but the double-hyphen name will remain for now.
+
+* Changelog
+
+** 0.1-pre
+
+Initial release.
 
 * Credits
 
 This package is based on [[https://github.com/lujun9972/pocket-api.el][pocket-api.el]] by [[https://github.com/lujun9972/pocket-api.el][DarkSun/lujun9972]], which is based on [[https://github.com/pterygota/el-pocket][el-pocket]] by [[https://github.com/pterygota/el-pocket][Tod Davies]].  It has essentially been completely written; no code remains except =pocket-lib-default-extra-headers=, a few lines in the call to =request=, and the consumer key is currently the same.
-
 * License
 
 GPLv3
