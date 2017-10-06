@@ -360,59 +360,41 @@ alist, get the `item-id' from it."
 
 ;;;;;; Tags
 
-;; FIXME: These need to be updated to act on multiple items at once
-;; instead of one-at-a-time.
-
-(defun pocket-reader-add-tags (new-tags)
+(defun pocket-reader-add-tags (tags)
   "Add tags to current item."
   (interactive (list (read-from-minibuffer "Tags: ")))
-  (let ((item (pocket-reader--current-item))
-        (new-tags (--> new-tags
-                       (s-split " " it 'omit-nulls)
-                       (s-join "," it)))
-        (old-tags (pocket-reader--get-property :tags)))
-    (pocket-reader--at-marked-or-current-items
-     (when (and new-tags
-                (pocket-lib--tags-action 'tags_add new-tags item))
-       ;; Tags added successfully
-       (pocket-reader--set-property :tags (append (s-split "," new-tags)
-                                                  old-tags))
-       (pocket-reader--set-tags-column)
-       ;; Fix face
-       (pocket-reader--apply-faces-to-line)))))
+  (let* ((new-tags (s-split (rx (or space ",")) tags 'omit-nulls))
+         (new-tags-string (s-join "," new-tags)))
+    (when (and new-tags-string
+               (pocket-lib--tags-action 'tags_add new-tags-string
+                                        (pocket-reader--marked-or-current-items)))
+      ;; Tags added successfully
+      (pocket-reader--at-marked-or-current-items
+       (pocket-reader--add-tags new-tags)))))
 
 (defun pocket-reader-remove-tags (remove-tags)
   "Remove tags from current item."
+  ;; FIXME: Get all tags with a function.
   (interactive (list (completing-read "Tags: " (pocket-reader--get-property :tags))))
-  (let* ((item (pocket-reader--current-item))
-         (old-tags (pocket-reader--get-property :tags))
-         (remove-tags (s-split " " remove-tags 'omit-nulls))
-         (remove-tags-string (s-join "," remove-tags))
-         (new-tags (or (seq-difference old-tags remove-tags)
-                       '(" "))))
-    (pocket-reader--at-marked-or-current-items
-     (when (and remove-tags
-                (pocket-lib--tags-action 'tags_remove remove-tags-string item))
-       ;; Tags removed successfully
-       (pocket-reader--set-property :tags new-tags)
-       (pocket-reader--set-tags-column)
-       ;; Fix face
-       (pocket-reader--apply-faces-to-line)))))
+  (let* ((remove-tags (s-split (rx (or space ",")) remove-tags 'omit-nulls))
+         (remove-tags-string (s-join "," remove-tags)))
+    (when (and remove-tags-string
+               (pocket-lib--tags-action 'tags_remove remove-tags-string
+                                        (pocket-reader--marked-or-current-items)))
+      ;; Tags removed successfully
+      (pocket-reader--at-marked-or-current-items
+       (pocket-reader--remove-tags remove-tags)))))
 
 (defun pocket-reader-set-tags (tags)
   "Set TAGS of current item."
   (interactive (list (read-from-minibuffer "Tags: ")))
   (with-pocket-reader
-   (let* ((item (pocket-reader--current-item))
-          (tags (s-split " " tags 'omit-nulls))
+   (let* ((tags (s-split (rx (or space ",")) tags 'omit-nulls))
           (tags-string (s-join "," tags)))
-     (pocket-reader--at-marked-or-current-items
-      (when (pocket-lib--tags-action 'tags_replace tags-string item)
-        ;; Tags replaced successfully
-        (pocket-reader--set-property :tags tags)
-        (pocket-reader--set-tags-column)
-        ;; Fix face
-        (pocket-reader--apply-faces-to-line))))))
+     (when (pocket-lib--tags-action 'tags_replace tags-string (pocket-reader--marked-or-current-items))
+       ;; Tags replaced successfully
+       (pocket-reader--at-marked-or-current-items
+        (pocket-reader--set-tags tags))))))
 
 ;;;;;; URL-opening
 
@@ -608,11 +590,6 @@ action in the Pocket API."
                collect (list (cons 'item_id (string-to-number id))))
       (list (pocket-reader--current-item))))
 
-(defun pocket-reader--set-tags-column ()
-  "Set tags column for current entry.
-Gets tags from text property."
-  (tabulated-list-set-col 4 (s-join "," (pocket-reader--get-property :tags))))
-
 (defun pocket-reader--set-tabulated-list-format ()
   "Set `tabulated-list-format' according to the maximum width of items about to be displayed."
   (let* ((site-width (cl-loop for item in pocket-reader-items
@@ -733,6 +710,36 @@ the date changes."
   "Update favorite star for current item."
   (tabulated-list-set-col 1 (if is-favorite "*" "") t)
   (pocket-reader--apply-faces-to-line))
+
+;;;;;; Tags
+
+(defun pocket-reader--add-tags (tags)
+  "Add TAGS to current item.
+TAGS should be a list of strings."
+  (let* ((old-tags (pocket-reader--get-property :tags))
+         (new-tags (append old-tags tags)))
+    (pocket-reader--set-tags new-tags)))
+
+(defun pocket-reader--remove-tags (tags)
+  "Remove TAGS from current item.
+TAGS should be a list of strings."
+  (let* ((old-tags (pocket-reader--get-property :tags))
+         (new-tags (seq-difference old-tags tags #'string=)))
+    (pocket-reader--set-tags new-tags)))
+
+(defun pocket-reader--set-tags (tags)
+  "Set current item's tags to TAGS.
+TAGS should be a list of strings.  Tags are sorted and
+deduplicated."
+  (let* ((tags (-sort #'string< (-uniq tags))))
+    (pocket-reader--set-property :tags tags)
+    (pocket-reader--set-tags-column)
+    (pocket-reader--apply-faces-to-line)))
+
+(defun pocket-reader--set-tags-column ()
+  "Set tags column for current entry.
+Gets tags from text property."
+  (tabulated-list-set-col 4 (s-join "," (pocket-reader--get-property :tags))))
 
 ;;;;;; Marking
 
