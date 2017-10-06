@@ -167,6 +167,7 @@ REGEXP REGEXP ...)."
 
 ;;;;;; Faces
 
+(defface pocket-reader-marked `((default :inverse-video t)) "Face for marked items")
 (defface pocket-reader-unread `((default :weight bold)) "Face for unread items")
 (defface pocket-reader-archived `((default :weight normal)) "Face for archived items")
 (defface pocket-reader-favorite-star `((default :foreground "#b58900")) "Face for archived items")
@@ -725,7 +726,7 @@ For example, if sorted by date, a spacer will be inserted where the date changes
   "Mark current item."
   (let* ((id (tabulated-list-get-id))
          (cons (cons id (ov (line-beginning-position) (line-end-position)
-                            'face 'highlight))))
+                            'face 'pocket-reader-marked))))
     (push cons pocket-reader-mark-overlays)))
 
 (defun pocket-reader--unmark-item (id)
