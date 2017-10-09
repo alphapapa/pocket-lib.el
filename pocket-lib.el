@@ -142,7 +142,7 @@ If FORCE is non-nil, get a new token."
             ;;  auth URL.  (browse-url url)
             (kill-new url))
           (setq pocket-lib--access-token-have-opened-browser t)
-          (error "Please go to the URL in the clipboard/kill-ring to authorize `pocket-lib', then try again")))))
+          (user-error "pocket-lib must be authorized first.  Please open your Web browser to the URL in the clipboard/kill-ring and follow the instructions, then try again")))))
 
 (defun pocket-lib-reset-auth ()
   "Reset all saved auth tokens.
