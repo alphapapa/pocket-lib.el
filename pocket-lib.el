@@ -242,18 +242,15 @@ Action may be a symbol or a string."
 (cl-defun pocket-lib-add-urls (&rest urls &key tags &allow-other-keys)
   "Add URLs to Pocket.
 TAGS may be a list of strings or nil."
-  (let (cur url-list)
-    (while (setq cur (pop urls))
-      (if (keywordp cur)
-          (set (intern-soft (substring (symbol-name cur) 1))
-               (pop urls))
-        (push cur url-list)))
-    (nreverse url-list)
-    (pocket-lib--send
-      (--map (list :action 'add
-                   :url it
-                   :tags tags)
-             url-list))))
+  (cl-loop for item in urls
+           if (keywordp item)
+           do (set (intern-soft (substring (symbol-name cur) 1)))
+           and do (delete item urls))
+  (pocket-lib--send
+    (--map (list :action 'add
+                 :url it
+                 :tags tags)
+           urls)))
 
 (defun pocket-lib-archive (&rest items)
   "Archive ITEMS."
