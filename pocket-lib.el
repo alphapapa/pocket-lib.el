@@ -4,7 +4,7 @@
 
 ;; Author: Adam Porter <adam@alphapapa.net
 ;; Created: 2017-08-18
-;; Version: 0.1
+;; Version: 0.2-pre
 ;; Keywords: pocket
 ;; Package-Requires: ((emacs "25.1") (request "0.2") (dash "2.13.0") (kv "0.0.19") (s "1.12.0"))
 ;; URL: https://github.com/alphapapa/pocket-lib.el
@@ -175,6 +175,7 @@ The response body is automatically parsed with `json-read'."
   (let* ((endpoint (cl-typecase endpoint
                      (symbol (symbol-name endpoint))
                      (string endpoint)))
+         (request-backend 'url-retrieve)
          (url (concat "https://getpocket.com/v3/" endpoint))
          (data (json-encode
                 (pocket-lib--plist-non-nil
