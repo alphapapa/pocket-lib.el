@@ -45,7 +45,7 @@ These functions operate on one or more items, which should be alists, structured
 
 * Changelog
 
-** 0.1-pre
+** 0.1
 
 Initial release.
 
