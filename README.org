@@ -25,6 +25,8 @@ First you must authorize this library to access your Pocket account.
 
 Now you can use the library.
 
+*Note:* Please /ignore/ any =Page Not Found= error you might see on the Pocket Web site after authorizing.  Just run the ~pocket-reader~ command after authorizing, and it should work.  You can verify that authorization completed by checking the file =~/.cache/emacs-pocket-lib-token.json=.
+
 ** Functions
 
 For more detailed information on each function, use =describe-function=.
