@@ -2,7 +2,7 @@
 
 ;; Copyright (C) 2004-2017 Free Software Foundation, Inc.
 
-;; Author: Adam Porter <adam@alphapapa.net
+;; Author: Adam Porter <adam@alphapapa.net>
 ;; Created: 2017-08-18
 ;; Version: 0.2-pre
 ;; Keywords: pocket
