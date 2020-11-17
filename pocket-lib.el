@@ -104,6 +104,8 @@ If token already exists, don't get a new one, unless FORCE is non-nil."
 (cl-defun pocket-lib--request-token (&key force)
   "Return request token.
 If no token exists, or if FORCE is non-nil, get a new token."
+  (unless (file-writeable-p (file-name-directory pocket-lib-token-file))
+    (user-error "Token file directory doesn't exist. Either create directory first or change value of `pocket-lib-token-file'"))
   (when (or (not pocket-lib--request-token)
             force)
     (let* ((response (pocket-lib--request 'oauth/request

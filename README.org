@@ -18,10 +18,11 @@ Put =pocket-lib.el= in your =load-path=.
 
 First you must authorize this library to access your Pocket account.
 
-1.  Open your web browser to the Pocket web site, and log out of Pocket.  (It seems to only work if you are logged out.)
-2.  Run =pocket-lib-get= (this is not an interactive command, so you should call it in the minibuffer like ~(pocket-lib-get)~; typically this will be handled for you by packages that use this library).  A URL will be copied to the clipboard and kill-ring.
-3.  Visit that URL in your browser, and authorize it.
-4.  Run =pocket-lib-get= again.  If it worked, you should see an ugly list of data containing the first 10 items on your list.
+1. Make sure the directory of =pocket-lib-token-file= exists.  If it doesn't then either create the directory or set =pocket-lib-token-file= to a file in an existing directory.
+2. Open your web browser to the Pocket web site, and log out of Pocket.  (It seems to only work if you are logged out.)
+3. Run =pocket-lib-get= (this is not an interactive command, so you should call it in the minibuffer like ~(pocket-lib-get)~; typically this will be handled for you by packages that use this library).  A URL will be copied to the clipboard and kill-ring.
+4. Visit that URL in your browser, and authorize it.
+5. Run =pocket-lib-get= again.  If it worked, you should see an ugly list of data containing the first 10 items on your list.
 
 Now you can use the library.
 
