@@ -186,7 +186,8 @@ The response body is automatically parsed with `json-read'."
     (request url
              :type "POST"
              :headers pocket-lib-default-extra-headers
-             :data data
+             ;; HACK: Encode JSON object string with UTF-8.
+             :data (encode-coding-string data 'utf-8 'nocopy)
              :sync sync
              :parser #'json-read
              :success (cl-function
