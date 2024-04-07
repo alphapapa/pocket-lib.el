@@ -49,11 +49,14 @@ These functions operate on one or more items, which should be alists, structured
 
 ** v0.3-pre
 
-Nothing new yet.
+*Changes*
+
++  Use [[https://github.com/alphapapa/plz.el][plz]] HTTP library.
 
 ** v0.2
 
 *Changes*
+
 +  Use =request='s =url-retrieve= backend to workaround [[https://github.com/tkf/emacs-request/issues/92][bug]].
 
 ** v0.1

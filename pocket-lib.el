@@ -6,7 +6,7 @@
 ;; Created: 2017-08-18
 ;; Version: 0.3-pre
 ;; Keywords: pocket
-;; Package-Requires: ((emacs "25.1") (request "0.2") (dash "2.13.0") (kv "0.0.19") (s "1.12.0"))
+;; Package-Requires: ((emacs "25.1") (plz "0.7.3") (dash "2.13.0") (kv "0.0.19") (s "1.12.0"))
 ;; URL: https://github.com/alphapapa/pocket-lib.el
 
 ;; This file is NOT part of GNU Emacs.
@@ -40,10 +40,10 @@
 
 (require 'cl-lib)
 (require 'json)
-(require 'request)
 
 (require 'dash)
 (require 'kv)
+(require 'plz)
 (require 's)
 
 ;;;; Variables
@@ -106,17 +106,14 @@ If token already exists, don't get a new one, unless FORCE is non-nil."
 If no token exists, or if FORCE is non-nil, get a new token."
   (when (or (not pocket-lib--request-token)
             force)
-    (let* ((response (pocket-lib--request 'oauth/request
-                       :data (list :redirect_uri "http://www.example.com")
-                       ;; Sync is required here, otherwise there won't
-                       ;; be a response when we try to parse it
-                       :sync t :no-auth t))
-           (data (request-response-data response))
-           (token (alist-get 'code data)))
-      (unless token
-        (error "Unable to get request token: %s" response))
-      (setq pocket-lib--request-token token)))
-  pocket-lib--request-token)
+    (condition-case err
+        (let* ((data (pocket-lib--request 'oauth/request
+                       :data (list :redirect_uri "http://www.example.com")))
+               (token (alist-get 'code data)))
+          (unless token
+            (error "No token"))
+          (setq pocket-lib--request-token token))
+      (error (error "pocket-lib: Unable to get request token: %s" err)))))
 
 (cl-defun pocket-lib--access-token (request-token &key force)
   "Return access token retrieved with REQUEST-TOKEN.
@@ -127,13 +124,11 @@ If FORCE is non-nil, get a new token."
         (if (and pocket-lib--access-token-have-opened-browser
                  (not force))
             ;; Already authorized in browser; try to get token
-            (let ((response (pocket-lib--request 'oauth/authorize
-                              :data (list :code request-token)
-                              ;; Sync is required here, otherwise there won't
-                              ;; be a response when we try to parse it
-                              :sync t :no-auth t)))
-              (or (request-response-data response)
-                  (error "Unable to get access token: %s" response)))
+            (or (condition-case err
+                    (or (pocket-lib--request 'oauth/authorize
+                          :data (list :code request-token))
+                        (error "No data"))
+                  (error (error "pocket-lib--access-token: Unable to get access token: %S" err))))
           ;; Not authorized yet, or forcing; browse to authorize
           ;; FIXME: Is this a nice way to do this?
           (let ((url (concat "https://getpocket.com/auth/authorize?request_token=" request-token)))
@@ -157,12 +152,11 @@ This should not be necessary unless something has gone wrong."
 
 ;;;;; Methods
 
-(cl-defun pocket-lib--request (endpoint &key data sync no-auth)
-  "Return response struct for an API request to <https://getpocket/com/v3/ENDPOINT>.
+(cl-defun pocket-lib--request (endpoint &key data no-auth)
+  "Return response body for an API request to <https://getpocket/com/v3/ENDPOINT>.
 
 ENDPOINT may be a string or symbol, e.g. `get'.  DATA should be a
-plist of API parameters; keys with nil values are removed.  SYNC
-is passed to `request''s `:sync' keyword.
+plist of API parameters; keys with nil values are removed.
 
 The consumer key and access token are included automatically,
 unless NO-AUTH is set, in which case the access token is left
@@ -175,7 +169,6 @@ The response body is automatically parsed with `json-read'."
   (let* ((endpoint (cl-typecase endpoint
                      (symbol (symbol-name endpoint))
                      (string endpoint)))
-         (request-backend 'url-retrieve)
          (url (concat "https://getpocket.com/v3/" endpoint))
          (data (json-encode
                 (pocket-lib--plist-non-nil
@@ -183,20 +176,10 @@ The response body is automatically parsed with `json-read'."
                                       :access_token (alist-get 'access_token
                                                                pocket-lib--access-token))
                                 data)))))
-    (request url
-             :type "POST"
-             :headers pocket-lib-default-extra-headers
-             ;; HACK: Encode JSON object string with UTF-8.
-             :data (encode-coding-string data 'utf-8 'nocopy)
-             :sync sync
-             :parser #'json-read
-             :success (cl-function
-                       (lambda (&key data &allow-other-keys)
-                         data))
-             :error (cl-function
-                     (lambda (&key data error-thrown symbol-status response &allow-other-keys)
-                       (error "Request error: URL:%s  DATA:%s  ERROR-THROWN:%s  SYMBOL-STATUS:%s  RESPONSE:%s"
-                              url data error-thrown symbol-status response))))))
+    (plz 'post url :headers pocket-lib-default-extra-headers
+      ;; HACK: Encode JSON object string with UTF-8.
+      :body (encode-coding-string data 'utf-8 'nocopy)
+      :as #'json-read)))
 
 (cl-defun pocket-lib-get (&key (offset 0) (count 10) (detail-type "simple")
                                state favorite tag content-type sort
@@ -204,19 +187,19 @@ The response body is automatically parsed with `json-read'."
   "Return JSON response for a \"get\" API request.
 Without any arguments, this simply returns the first 10
 unarchived, unfavorited, untagged items in the user's list.  Keys
-set to nil will not be sent in the request.  See
+set to nil will not be sent in the request.  Arguments OFFSET,
+COUNT, STATE, FAVORITE, TAG, CONTENT-TYPE, SEARCH, DOMAIN, SINCE,
+DETAIL-TYPE, and SORT may be specified.  See
 <https://getpocket.com/developer/docs/v3/retrieve>."
   (declare (indent defun))
-  (let ((offset (number-to-string offset))
-        (count (number-to-string count))
-        (data (list :offset offset :count count :detailType detail-type
-                    :state state :favorite favorite :tag tag
-                    :content-type content-type :sort sort
-                    :search search :domain domain :since since)))
-    (request-response-data
-     (pocket-lib--request 'get
-       :data data
-       :sync t))))
+  (let* ((offset (number-to-string offset))
+         (count (number-to-string count))
+         (data (list :offset offset :count count :detailType detail-type
+                     :state state :favorite favorite :tag tag
+                     :content-type content-type :sort sort
+                     :search search :domain domain :since since)))
+    (pocket-lib--request 'get
+      :data data)))
 
 (cl-defun pocket-lib--send (actions)
   "Return JSON response for a \"send\" API request containing ACTIONS.
@@ -224,10 +207,8 @@ ACTIONS should be a list of actions; this function will convert
 it into a vector automatically. See
 <https://getpocket.com/developer/docs/v3/modify>."
   (declare (indent defun))
-  (request-response-data
-   (pocket-lib--request 'send
-     :data (list :actions (vconcat actions))
-     :sync t)))
+  (pocket-lib--request 'send
+    :data (list :actions (vconcat actions))))
 
 ;;;;; Actions
 
