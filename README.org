@@ -47,12 +47,16 @@ These functions operate on one or more items, which should be alists, structured
 
 * Changelog
 
-** 0.2
+** v0.3-pre
+
+Nothing new yet.
+
+** v0.2
 
 *Changes*
 +  Use =request='s =url-retrieve= backend to workaround [[https://github.com/tkf/emacs-request/issues/92][bug]].
 
-** 0.1
+** v0.1
 
 Initial release.
 
