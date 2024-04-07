@@ -187,15 +187,17 @@ The response body is automatically parsed with `json-read'."
   "Return JSON response for a \"get\" API request.
 Without any arguments, this simply returns the first 10
 unarchived, unfavorited, untagged items in the user's list.  Keys
-set to nil will not be sent in the request.  See
+set to nil will not be sent in the request.  Arguments OFFSET,
+COUNT, STATE, FAVORITE, TAG, CONTENT-TYPE, SEARCH, DOMAIN, SINCE,
+DETAIL-TYPE, and SORT may be specified.  See
 <https://getpocket.com/developer/docs/v3/retrieve>."
   (declare (indent defun))
-  (let ((offset (number-to-string offset))
-        (count (number-to-string count))
-        (data (list :offset offset :count count :detailType detail-type
-                    :state state :favorite favorite :tag tag
-                    :content-type content-type :sort sort
-                    :search search :domain domain :since since)))
+  (let* ((offset (number-to-string offset))
+         (count (number-to-string count))
+         (data (list :offset offset :count count :detailType detail-type
+                     :state state :favorite favorite :tag tag
+                     :content-type content-type :sort sort
+                     :search search :domain domain :since since)))
     (pocket-lib--request 'get
       :data data)))
 
