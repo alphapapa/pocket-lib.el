@@ -47,7 +47,7 @@ These functions operate on one or more items, which should be alists, structured
 
 * Changelog
 
-** 0.2-pre
+** 0.2
 
 *Changes*
 +  Use =request='s =url-retrieve= backend to workaround [[https://github.com/tkf/emacs-request/issues/92][bug]].
