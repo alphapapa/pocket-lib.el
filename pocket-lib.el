@@ -106,17 +106,19 @@ If token already exists, don't get a new one, unless FORCE is non-nil."
 If no token exists, or if FORCE is non-nil, get a new token."
   (unless (file-writable-p pocket-lib-token-file)
     (error "pocket-lib: Token file %S not writable" pocket-lib-token-file))
-  (when (or (not pocket-lib--request-token)
-            force)
-    (condition-case err
-        (let* ((data (pocket-lib--request 'oauth/request
-                       :data (list :redirect_uri "http://www.example.com")
-                       :no-auth 't))
-               (token (alist-get 'code data)))
-          (unless token
-            (error "No token"))
-          (setq pocket-lib--request-token token))
-      (error (error "pocket-lib: Unable to get request token: %s" err)))))
+  (if (or (not pocket-lib--request-token)
+          force)
+      (condition-case err
+          (let* ((data (pocket-lib--request 'oauth/request
+                         :data (list :redirect_uri "http://www.example.com")
+                         :no-auth 't))
+                 (token (alist-get 'code data)))
+            (unless token
+              (error "No token"))
+            (setq pocket-lib--request-token token))
+        (error (error "pocket-lib: Unable to get request token: %s" err)))
+    ;; otherwise return the saved token
+    pocket-lib--request-token))
 
 (cl-defun pocket-lib--access-token (request-token &key force)
   "Return access token retrieved with REQUEST-TOKEN.
