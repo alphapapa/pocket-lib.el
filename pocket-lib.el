@@ -111,7 +111,7 @@ If no token exists, or if FORCE is non-nil, get a new token."
       (condition-case err
           (let* ((data (pocket-lib--request 'oauth/request
                          :data (list :redirect_uri "http://www.example.com")
-                         :no-auth 't))
+                         :no-auth t))
                  (token (alist-get 'code data)))
             (unless token
               (error "No token"))
@@ -132,7 +132,7 @@ If FORCE is non-nil, get a new token."
             (or (condition-case err
                     (or (pocket-lib--request 'oauth/authorize
                           :data (list :code request-token)
-                          :no-auth 't)
+                          :no-auth t)
                         (error "No data"))
                   (error (error "pocket-lib--access-token: Unable to get access token: %S" err))))
           ;; Not authorized yet, or forcing; browse to authorize
