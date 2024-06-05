@@ -104,6 +104,8 @@ If token already exists, don't get a new one, unless FORCE is non-nil."
 (cl-defun pocket-lib--request-token (&key force)
   "Return request token.
 If no token exists, or if FORCE is non-nil, get a new token."
+  (unless (file-writable-p pocket-lib-token-file)
+    (error "pocket-lib: Token file %S not writable" pocket-lib-token-file))
   (when (or (not pocket-lib--request-token)
             force)
     (condition-case err
