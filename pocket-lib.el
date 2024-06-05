@@ -49,7 +49,6 @@
 ;;;; Variables
 
 (defvar pocket-lib--access-token-have-opened-browser nil)
-(defvar pocket-lib--request-token nil)
 (defvar pocket-lib--access-token nil)
 (defconst pocket-lib-default-extra-headers
   '(("Host" . "getpocket.com")
@@ -100,8 +99,7 @@ Sets token in variable `pocket-lib--access-token'."
   (setq pocket-lib--access-token token))
 
 (defun pocket-lib--request-token ()
-  "Return and set new request token.
-Sets token in variable `pocket-lib--request-token'."
+  "Return new request token."
   (unless (file-writable-p pocket-lib-token-file)
     (error "pocket-lib: Token file %S not writable" pocket-lib-token-file))
   (condition-case err
@@ -109,9 +107,8 @@ Sets token in variable `pocket-lib--request-token'."
                      :data (list :redirect_uri "http://www.example.com")
                      :no-auth t))
              (token (alist-get 'code data)))
-        (unless token
-          (error "No token received: %S" data))
-        (setq pocket-lib--request-token token))
+        (or token
+            (error "No token received: %S" data)))
     (error (error "pocket-lib: Unable to get request token: %s" err))))
 
 (cl-defun pocket-lib--access-token (request-token &key force)
@@ -141,8 +138,7 @@ If FORCE is non-nil, get a new token."
   "Reset all saved auth tokens.
 This should not be necessary unless something has gone wrong."
   (interactive)
-  (setq pocket-lib--request-token nil
-        pocket-lib--access-token nil
+  (setq pocket-lib--access-token nil
         pocket-lib--access-token-have-opened-browser nil)
   (with-temp-file pocket-lib-token-file
     nil))
