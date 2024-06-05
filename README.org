@@ -51,7 +51,11 @@ These functions operate on one or more items, which should be alists, structured
 
 *Changes*
 
-+  Use [[https://github.com/alphapapa/plz.el][plz]] HTTP library.
++ Use [[https://github.com/alphapapa/plz.el][plz]] HTTP library.
+
+*Fixes*
+
++ Ensure token file is writable.  ([[https://github.com/alphapapa/pocket-lib.el/pull/1][#1]].  Thanks to [[https://github.com/alphapapa/pocket-lib.el/issues?q=is%3Apr+is%3Aopen+author%3Akevinjfoley][Kevin Foley]].)
 
 ** v0.2
 
