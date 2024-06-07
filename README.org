@@ -59,7 +59,7 @@ These functions operate on one or more items, which should be alists, structured
 
 *Acknowledgments*
 
-+ Thanks to [[https://github.com/joshbax189][Josh B]] for reporting and helping to fix a bug with initial authentication.
++ Thanks to [[https://github.com/joshbax189][Josh B]] for reporting and helping to fix a bug with initial authentication ([[https://github.com/alphapapa/pocket-lib.el/pull/7][#7]]).
 
 ** v0.2
 
