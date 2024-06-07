@@ -49,7 +49,6 @@
 ;;;; Variables
 
 (defvar pocket-lib--access-token-have-opened-browser nil)
-(defvar pocket-lib--request-token nil)
 (defvar pocket-lib--access-token nil)
 (defconst pocket-lib-default-extra-headers
   '(("Host" . "getpocket.com")
@@ -74,80 +73,72 @@
 
 ;;;;; Authorization
 
-(cl-defun pocket-lib--authorize (&key force)
-  "Get and save authorization token.
-If token already exists, don't get a new one, unless FORCE is non-nil."
-  (when (or (null pocket-lib--access-token)
-            force)
-    (unless force
-      ;; Try to load from file
-      (pocket-lib--load-access-token))
-    (when (or (null pocket-lib--access-token) force)
-      ;; Get new token
-      (if-let ((request-token (pocket-lib--request-token :force force))
-               (access-token (pocket-lib--access-token request-token :force force)))
-          (pocket-lib--save-access-token access-token)
-        (error "Unable to authorize (request-token:%s)" request-token)))))
+(defun pocket-lib--authorize (&optional forcep)
+  "Load or request access token and set it.
+If FORCEP, ignore a saved token and request a new one; otherwise
+request a new one only if a saved one is not available.  Sets
+token in variable `pocket-lib--access-token'."
+  (when (or forcep (null (pocket-lib--load-access-token)))
+    (if-let ((request-token (pocket-lib--request-token))
+             (access-token (pocket-lib--access-token request-token :force forcep)))
+        (pocket-lib--save-access-token access-token)
+      (error "Unable to authorize (request-token:%s)" request-token))))
 
 (defun pocket-lib--load-access-token ()
-  "Load access token from `pocket-lib-token-file'."
+  "Load and return access token from `pocket-lib-token-file'.
+Sets token in variable `pocket-lib--access-token'."
   (when (file-readable-p pocket-lib-token-file)
     (setq pocket-lib--access-token (ignore-errors
                                      (json-read-file pocket-lib-token-file)))))
 
 (defun pocket-lib--save-access-token (token)
-  "Write TOKEN to `pocket-lib-token-file' and set variable."
+  "Write TOKEN to `pocket-lib-token-file' and set variable.
+Sets token in variable `pocket-lib--access-token'."
   (with-temp-file pocket-lib-token-file
     (insert (json-encode-alist token)))
   (setq pocket-lib--access-token token))
 
-(cl-defun pocket-lib--request-token (&key force)
-  "Return request token.
-If no token exists, or if FORCE is non-nil, get a new token."
+(defun pocket-lib--request-token ()
+  "Return new request token."
   (unless (file-writable-p pocket-lib-token-file)
     (error "pocket-lib: Token file %S not writable" pocket-lib-token-file))
-  (when (or (not pocket-lib--request-token)
-            force)
-    (condition-case err
-        (let* ((data (pocket-lib--request 'oauth/request
-                       :data (list :redirect_uri "http://www.example.com")))
-               (token (alist-get 'code data)))
-          (unless token
-            (error "No token"))
-          (setq pocket-lib--request-token token))
-      (error (error "pocket-lib: Unable to get request token: %s" err)))))
+  (condition-case err
+      (let* ((data (pocket-lib--request 'oauth/request
+                     :data (list :redirect_uri "http://www.example.com")
+                     :no-auth t))
+             (token (alist-get 'code data)))
+        (or token
+            (error "No token received: %S" data)))
+    (error (error "pocket-lib: Unable to get request token: %s" err))))
 
 (cl-defun pocket-lib--access-token (request-token &key force)
   "Return access token retrieved with REQUEST-TOKEN.
 If FORCE is non-nil, get a new token."
-  (if (or (null pocket-lib--access-token)
-          force)
-      (progn
-        (if (and pocket-lib--access-token-have-opened-browser
-                 (not force))
-            ;; Already authorized in browser; try to get token
-            (or (condition-case err
-                    (or (pocket-lib--request 'oauth/authorize
-                          :data (list :code request-token))
-                        (error "No data"))
-                  (error (error "pocket-lib--access-token: Unable to get access token: %S" err))))
-          ;; Not authorized yet, or forcing; browse to authorize
-          ;; FIXME: Is this a nice way to do this?
-          (let ((url (concat "https://getpocket.com/auth/authorize?request_token=" request-token)))
-            ;; NOTE: Doing it in w3m doesn't seem to work.  It only
-            ;;  seems to work in a regular browser, and then only when
-            ;;  the user is logged out of Pocket when he accesses the
-            ;;  auth URL.  (browse-url url)
-            (kill-new url))
-          (setq pocket-lib--access-token-have-opened-browser t)
-          (user-error "pocket-lib must be authorized first.  Please open your Web browser to the URL in the clipboard/kill-ring and follow the instructions, then try again")))))
+  (if (and pocket-lib--access-token-have-opened-browser
+           (not force))
+      ;; Already authorized in browser; try to get token
+      (or (condition-case err
+              (or (pocket-lib--request 'oauth/authorize
+                    :data (list :code request-token)
+                    :no-auth t)
+                  (error "No data"))
+            (error (error "pocket-lib--access-token: Unable to get access token: %S" err))))
+    ;; Not authorized yet, or forcing; browse to authorize
+    ;; FIXME: Is this a nice way to do this?
+    (let ((url (concat "https://getpocket.com/auth/authorize?request_token=" request-token)))
+      ;; NOTE: Doing it in w3m doesn't seem to work.  It only
+      ;;  seems to work in a regular browser, and then only when
+      ;;  the user is logged out of Pocket when he accesses the
+      ;;  auth URL.  (browse-url url)
+      (kill-new url))
+    (setq pocket-lib--access-token-have-opened-browser t)
+    (user-error "pocket-lib must be authorized first.  Please open your Web browser to the URL in the clipboard/kill-ring and follow the instructions, then try again")))
 
 (defun pocket-lib-reset-auth ()
   "Reset all saved auth tokens.
 This should not be necessary unless something has gone wrong."
   (interactive)
-  (setq pocket-lib--request-token nil
-        pocket-lib--access-token nil
+  (setq pocket-lib--access-token nil
         pocket-lib--access-token-have-opened-browser nil)
   (with-temp-file pocket-lib-token-file
     nil))
