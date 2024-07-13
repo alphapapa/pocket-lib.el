@@ -49,6 +49,7 @@
 ;;;; Variables
 
 (defvar pocket-lib--access-token-have-opened-browser nil)
+(defvar pocket-lib--request-token nil)
 (defvar pocket-lib--access-token nil)
 (defconst pocket-lib-default-extra-headers
   '(("Host" . "getpocket.com")
@@ -79,7 +80,8 @@ If FORCEP, ignore a saved token and request a new one; otherwise
 request a new one only if a saved one is not available.  Sets
 token in variable `pocket-lib--access-token'."
   (when (or forcep (null (pocket-lib--load-access-token)))
-    (if-let ((request-token (pocket-lib--request-token))
+    (if-let ((request-token (or pocket-lib--request-token
+                                (pocket-lib--request-token)))
              (access-token (pocket-lib--access-token request-token :force forcep)))
         (pocket-lib--save-access-token access-token)
       (error "Unable to authorize (request-token:%s)" request-token))))
@@ -94,21 +96,22 @@ Sets token in variable `pocket-lib--access-token'."
 (defun pocket-lib--save-access-token (token)
   "Write TOKEN to `pocket-lib-token-file' and set variable.
 Sets token in variable `pocket-lib--access-token'."
+  (unless (file-writable-p pocket-lib-token-file)
+    (error "pocket-lib: Token file %S not writable" pocket-lib-token-file))
   (with-temp-file pocket-lib-token-file
     (insert (json-encode-alist token)))
   (setq pocket-lib--access-token token))
 
 (defun pocket-lib--request-token ()
   "Return new request token."
-  (unless (file-writable-p pocket-lib-token-file)
-    (error "pocket-lib: Token file %S not writable" pocket-lib-token-file))
   (condition-case err
       (let* ((data (pocket-lib--request 'oauth/request
                      :data (list :redirect_uri "http://www.example.com")
                      :no-auth t))
              (token (alist-get 'code data)))
-        (or token
-            (error "No token received: %S" data)))
+        (if token
+            (setq pocket-lib--request-token token)
+          (error "No token received: %S" data)))
     (error (error "pocket-lib: Unable to get request token: %s" err))))
 
 (cl-defun pocket-lib--access-token (request-token &key force)
