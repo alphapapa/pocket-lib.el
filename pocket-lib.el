@@ -141,7 +141,8 @@ If FORCE is non-nil, get a new token."
   "Reset all saved auth tokens.
 This should not be necessary unless something has gone wrong."
   (interactive)
-  (setq pocket-lib--access-token nil
+  (setq pocket-lib--request-token nil
+        pocket-lib--access-token nil
         pocket-lib--access-token-have-opened-browser nil)
   (with-temp-file pocket-lib-token-file
     nil))
